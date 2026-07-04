@@ -299,8 +299,8 @@ function App() {
 
   return (
     <main className="flex h-screen flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-y-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+        <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-sm font-semibold">SearchIt</h1>
           <nav className="flex gap-1 text-sm">
             <TabButton active={tab === "home"} onClick={() => setTab("home")}>
@@ -329,7 +329,7 @@ function App() {
             </TabButton>
           </nav>
         </div>
-        <div className="flex items-center gap-2 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500">
           {tab === "map" && (
             <button
               type="button"
