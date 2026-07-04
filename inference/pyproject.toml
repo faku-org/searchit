@@ -1,0 +1,45 @@
+[project]
+name = "searchit-inference"
+version = "0.1.0"
+description = "Local ML inference service for SearchIt (OCR, face recognition, CLIP embeddings)"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "pydantic-settings>=2.6",
+  "pillow>=11.0",
+]
+
+[project.optional-dependencies]
+# Only needed on the machine that actually runs inference (the GPU box).
+# Not installed by default so `uv sync` stays fast for mock-mode development.
+ml = [
+  # DeepSeek-OCR-2's model card validates against torch==2.6.0, but that
+  # build predates Blackwell (sm_120, RTX 50-series) kernel support -- it
+  # has no kernel image for this GPU at all. 2.9.1+ is the first stable
+  # line with real sm_120 support; pulled from the cu128 index below rather
+  # than PyPI's default build.
+  "torch>=2.9.1",
+  "torchvision>=0.24",
+  "transformers==4.46.3",
+  "tokenizers==0.20.3",
+  "einops",
+  "addict",
+  "easydict",
+  "insightface>=0.7",
+  # This is the actual CUDA box, so use the GPU build (plain onnxruntime is
+  # only for machines without a GPU / running the ml extra on a CPU host).
+  "onnxruntime-gpu>=1.19",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128" }]
+torchvision = [{ index = "pytorch-cu128" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

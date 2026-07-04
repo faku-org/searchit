@@ -1,0 +1,1 @@
+ALTER TABLE "photos" ADD COLUMN "recognized_text" text;

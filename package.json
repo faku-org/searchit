@@ -1,0 +1,43 @@
+{
+  "name": "searchit",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["server", "packages/*"],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit && bun run --cwd server typecheck",
+    "lint": "oxlint .",
+    "server": "bun run --cwd server dev",
+    "db:generate": "bun run --cwd server db:generate",
+    "db:migrate": "bun run --cwd server db:migrate"
+  },
+  "dependencies": {
+    "@searchit/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "autoprefixer": "^10.5.2",
+    "leaflet": "^1.9.4",
+    "motion": "^12.42.2",
+    "postcss": "^8.5.16",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.3.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/leaflet": "^1.9.21",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "oxlint": "^0.15.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}

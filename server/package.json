@@ -1,0 +1,27 @@
+{
+  "name": "@searchit/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.2",
+    "@searchit/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "elysia": "^1.4.29",
+    "exifr": "^7.1.3",
+    "nanoid": "^5.1.16",
+    "postgres": "^3.4.9",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "drizzle-kit": "^0.31.10"
+  }
+}

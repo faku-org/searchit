@@ -1,0 +1,1 @@
+ALTER TABLE "face_embeddings" ADD COLUMN "confidence" real NOT NULL;

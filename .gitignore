@@ -1,0 +1,46 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# SearchIt services
+server/.env
+inference/.env
+inference/.venv
+inference/__pycache__
+inference/**/__pycache__
+inference/.ocr_scratch
+inference/*.pt
+data/
+*.env
+!*.env.example
+
+# Tauri updater signing key -- never commit, store in GitHub Actions secrets instead
+src-tauri/.updater.key
+src-tauri/.updater.key.pub
+
+# Claude Code local runtime state (session locks, not shared config)
+.claude/
+
+# Stray file created by an errant `> NUL` redirect on Windows
+/NUL
