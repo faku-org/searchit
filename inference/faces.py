@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from config import get_settings
+from config import get_execution_providers, get_settings
 
 if TYPE_CHECKING:
     from PIL.Image import Image
@@ -20,9 +20,18 @@ def _load_app():
     from insightface.app import FaceAnalysis
 
     settings = get_settings()
-    ctx_id = 0 if settings.searchit_device == "cuda" else -1
+    # insightface runs on onnxruntime already, so real on-device acceleration
+    # (Neural Engine/GPU via CoreML on macOS, any DX12 GPU via DirectML on
+    # Windows, CUDA on the `ml` extra's NVIDIA box) is just a matter of which
+    # providers we hand it -- see config.get_execution_providers.
+    providers = get_execution_providers()
+    ctx_id = -1 if providers == ["CPUExecutionProvider"] else 0
 
-    face_app = FaceAnalysis(name="buffalo_l")
+    face_app = FaceAnalysis(
+        name="buffalo_l",
+        root=settings.model_cache_dir,
+        providers=providers,
+    )
     face_app.prepare(
         ctx_id=ctx_id, det_size=(640, 640), det_thresh=settings.face_det_thresh
     )

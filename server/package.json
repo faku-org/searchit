@@ -11,6 +11,8 @@
     "db:migrate": "bun src/db/migrate.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-pgvector": "^0.0.5",
     "@elysiajs/cors": "^1.4.2",
     "@searchit/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",

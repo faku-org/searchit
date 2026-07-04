@@ -8,11 +8,38 @@ dependencies = [
   "uvicorn[standard]>=0.32",
   "pydantic-settings>=2.6",
   "pillow>=11.0",
+  # Real on-device inference for faces + CLIP, everywhere, with no
+  # torch/CUDA needed: insightface and the CLIP embedder both run on plain
+  # onnxruntime (see config.get_execution_providers). CPU always works; the
+  # `directml` extra below adds Windows GPU accel, and macOS's onnxruntime
+  # wheel already bundles the CoreML execution provider.
+  "onnxruntime>=1.19",
+  "insightface>=0.7",
+  # CLIPImageProcessor/CLIPTokenizerFast only (pre/post-processing, not the
+  # torch model itself -- see clip_embed.py, which loads the actual weights
+  # as ONNX).
+  "transformers>=4.46",
+  "huggingface-hub>=0.26",
+  # OS-native OCR (ocr_native.py) covers Windows/macOS for free; this is the
+  # fallback ONNX OCR tier for everything else, bundled with its own small
+  # model weights (no separate download).
+  "rapidocr>=2.0",
+  "winsdk>=1.0.0b0; sys_platform == 'win32'",
+  "pyobjc-framework-Vision; sys_platform == 'darwin'",
+  "pyobjc-framework-Quartz; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
-# Only needed on the machine that actually runs inference (the GPU box).
-# Not installed by default so `uv sync` stays fast for mock-mode development.
+# Windows GPU acceleration (any DX12 GPU, not just NVIDIA) for the onnxruntime
+# EP path. Same import name as the base `onnxruntime` package -- installing
+# this replaces it rather than adding to it, so it's opt-in per machine
+# rather than a base dependency.
+directml = ["onnxruntime-directml>=1.19"]
+
+# Only needed on the machine that actually runs the higher-quality
+# DeepSeek-OCR-2 tier (see ocr.py / app.py's _use_deepseek_ocr) -- an NVIDIA
+# CUDA box. Not installed by default so `uv sync` stays fast for mock-mode
+# development and the desktop client build never needs it.
 ml = [
   # DeepSeek-OCR-2's model card validates against torch==2.6.0, but that
   # build predates Blackwell (sm_120, RTX 50-series) kernel support -- it
@@ -26,9 +53,8 @@ ml = [
   "einops",
   "addict",
   "easydict",
-  "insightface>=0.7",
-  # This is the actual CUDA box, so use the GPU build (plain onnxruntime is
-  # only for machines without a GPU / running the ml extra on a CPU host).
+  # Same import name as the base `onnxruntime` package -- this replaces it
+  # so insightface also gets CUDA acceleration on this box.
   "onnxruntime-gpu>=1.19",
 ]
 

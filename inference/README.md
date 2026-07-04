@@ -1,8 +1,11 @@
 # SearchIt inference service
 
-FastAPI service that does OCR, face recognition, and CLIP embeddings. Runs on
-the machine with the GPU (the central server), not on the Tauri client
-machines.
+FastAPI service that does OCR, face recognition, and CLIP embeddings. Runs
+locally on each desktop client (bundled as a Tauri sidecar), using real
+on-device inference -- Neural Engine/GPU via CoreML on macOS, any DX12 GPU via
+DirectML on Windows, CPU everywhere as a guaranteed fallback. A separate,
+higher-quality OCR tier (DeepSeek-OCR-2) is still available for anyone running
+this service by hand on an NVIDIA CUDA box.
 
 ## Dev / mock mode (no GPU, no model weights needed)
 
@@ -21,7 +24,49 @@ filenames actually clusters together under the real cosine-distance matching
 logic in the server -- this is what makes the identity-matching pipeline
 testable without GPU weights, not just the ingest plumbing.
 
-## Real inference (on the GPU box)
+## Real inference, on-device (the desktop client default)
+
+With `INFERENCE_MOCK=false` and no `OCR_MODEL_PATH` configured, every endpoint
+runs a real model, entirely on plain `onnxruntime` -- no torch, no CUDA
+required:
+
+- **Faces** (`faces.py`): `insightface`'s `buffalo_l` pack (detector + ArcFace
+  512-dim embeddings), auto-downloaded into `MODEL_CACHE_DIR` on first use.
+- **CLIP** (`clip_embed.py`): a pre-exported ONNX build of
+  `openai/clip-vit-base-patch32` (`Xenova/clip-vit-base-patch32`'s quantized
+  vision/text encoders, ~150MB combined), also downloaded on first use.
+- **OCR** (`ocr_native.py`): OS-native text recognition where the OS ships one
+  for free -- Apple Vision on macOS, `Windows.Media.Ocr` on Windows -- with no
+  model download at all. Any other platform (e.g. Linux dev machines) falls
+  back to a small bundled ONNX OCR model (RapidOCR), which ships its own
+  weights in the pip package.
+
+`config.get_execution_providers()` picks the best available onnxruntime
+execution provider at runtime (`ort.get_available_providers()`), in this
+order: CUDA (if the `ml` extra's `onnxruntime-gpu` is installed and a CUDA GPU
+is present) > the platform's native accelerator (CoreML on macOS,
+`DmlExecutionProvider` on Windows if the `directml` extra is installed) > CPU.
+Windows GPU acceleration is opt-in because it needs a different, mutually
+exclusive `onnxruntime` build:
+
+```
+uv sync --extra directml
+```
+
+(macOS needs no extra install -- the standard `onnxruntime` wheel already
+bundles the CoreML execution provider.)
+
+The Apple Vision path in `ocr_native.py` is written against Apple's documented
+Vision APIs but hasn't been run on an actual Mac yet -- re-verify it there
+before relying on it.
+
+## Real inference, DeepSeek-OCR-2 tier (NVIDIA CUDA box only)
+
+`app.py`'s `_use_deepseek_ocr` switches `/read-scene-text` to this tier
+automatically whenever `OCR_MODEL_PATH` is set *and* a CUDA-capable torch is
+importable -- otherwise it always falls back to `ocr_native.py`, even if
+`OCR_MODEL_PATH` is configured. This tier is torch+CUDA only and multi-GB, so
+it's opt-in and never used on a plain desktop client:
 
 1. Install the ML extra: `uv sync --extra ml`
 2. (Optional) Install `flash-attn` separately (needs a CUDA toolchain to
@@ -54,17 +99,11 @@ the model's commentary as recognized text.
 ## Face recognition
 
 `faces.py` uses `insightface`'s `buffalo_l` model pack (detector + ArcFace
-512-dim embeddings), which auto-downloads on first use -- no manual weight
-placement needed. `ctx_id` is derived from `SEARCHIT_DEVICE` (`0` for cuda,
-`-1` for cpu); there's no Apple Silicon path since inference always runs on
-the GPU box, not the Mac client.
-
-insightface runs through onnxruntime, not torch directly -- if
-`onnxruntime-gpu`'s CUDA execution provider can't find matching CUDA
-12.x/cuDNN 9.x runtime libraries on the box (e.g. only a newer CUDA Toolkit is
-installed system-wide), it silently falls back to `CPUExecutionProvider`.
-Check `ort.get_available_providers()` if you need this on GPU; CPU is fine
-for typical ingest volumes.
+512-dim embeddings), which auto-downloads on first use into `MODEL_CACHE_DIR`
+-- no manual weight placement needed. `providers` comes from
+`config.get_execution_providers()` (see above); `ctx_id` is derived from
+whether that resolved to CPU-only or not, since some of insightface's
+non-onnxruntime post-processing branches on it.
 
 The match-or-new-identity threshold (`FACE_MATCH_MAX_DISTANCE`, in the
 server's env) is a cosine-distance cutoff and needs tuning against real

@@ -8,32 +8,52 @@ etc.) when working with code in this repository.
 SearchIt is a desktop app (Tauri + React) for a race/event photographer: photos
 land in a watched folder, get auto-tagged (faces, GPS, OCR text, visual
 embeddings), and can be searched/browsed by bib number, date, location,
-description, or by finding a specific person. It's three independently-run
-processes plus Postgres:
+description, or by finding a specific person. It's three processes, each of
+which can run standalone in dev, but which the shipped desktop app bundles and
+autostarts as sidecars on every install (Mac + Windows) — no Docker, Postgres,
+Python, or Bun install required on the end user's machine:
 
-- **Client** (repo root, `src/`) — Tauri + React 19 + Vite + Tailwind v4.
-- **Server** (`server/`) — Bun + Elysia API, owns the Postgres/Drizzle schema
-  and the folder-watching ingest pipeline.
+- **Client** (repo root, `src/`) — Tauri + React 19 + Vite + Tailwind v4. Its
+  Rust side (`src-tauri/src/lib.rs`) spawns the other two as sidecar
+  processes on app launch (see "Tauri specifics" below).
+- **Server** (`server/`) — Bun + Elysia API, owns the Drizzle schema and the
+  folder-watching ingest pipeline. Talks to an embedded PGlite database by
+  default (no external Postgres needed); pointing `DATABASE_URL` at a real
+  Postgres is an opt-in dev/Docker escape hatch, not the bundled path.
 - **Inference** (`inference/`) — Python FastAPI microservice (OCR, face
-  recognition, CLIP embeddings). Talks HTTP, not a library import, so it can
-  run on a separate GPU box from the API server.
-- **Postgres** with the `pgvector` extension (`docker-compose.yml`).
+  recognition, CLIP embeddings). Talks HTTP, not a library import. Runs real
+  on-device inference on every platform via plain `onnxruntime` (Neural
+  Engine/GPU via CoreML on macOS, any DX12 GPU via DirectML on Windows, CPU
+  everywhere as fallback) — no torch/CUDA required for the bundled desktop
+  tier. A separate, higher-quality DeepSeek-OCR-2 tier (torch+CUDA, opt-in
+  `ml` extra) is still available for anyone running this by hand on an
+  NVIDIA GPU box; see `inference/README.md`.
 
 ## Commands
 
 ```bash
 bun install                 # installs root + server + packages/* workspaces
 bun dev                     # vite dev server (port 1420, Tauri-aware)
-bun run tauri dev           # launch the actual desktop window
+bun run tauri dev           # launch the actual desktop window (autostarts both sidecars)
 bun run build               # tsc && vite build
 bun run tauri build         # produce installers (see release workflow below)
 bun run typecheck           # tsc --noEmit (root) && tsc --noEmit (server)
 bun run lint                # oxlint . (root config covers client + server)
-bun run server              # bun --watch server/src/index.ts
+bun run server              # bun --watch server/src/index.ts (standalone, not via Tauri)
+bun run bundle:server       # stage the server + Bun runtime as Tauri sidecar resources
+bun run bundle:inference    # PyInstaller-build the inference service as a Tauri sidecar resource
 bun run db:generate         # drizzle-kit generate (from a schema.ts change)
 bun run db:migrate          # apply migrations (server/src/db/migrate.ts)
-docker-compose up -d        # postgres (pgvector/pgvector:pg16), must be up first
+docker-compose up -d        # optional: external postgres for the DATABASE_URL dev escape hatch
 ```
+
+`bun run tauri dev`/`tauri build` already run `bundle:server` and
+`bundle:inference` automatically (`tauri.conf.json`'s `beforeDevCommand` /
+`beforeBuildCommand`) -- you don't need to invoke those two directly unless
+scripting something outside Tauri. `bundle:inference` is slow (PyInstaller +
+a fresh `uv sync`, ~1-2 min) so it's skipped once already staged; force a
+rebuild after inference source/dependency changes with
+`FORCE_REBUILD_INFERENCE=1 bun run bundle:inference`.
 
 Inference service uses `uv`, not Bun — it's Python:
 
@@ -46,16 +66,18 @@ uv run uvicorn app:app --reload --port 8000
 
 `INFERENCE_MOCK=true` (the `.env.example` default) fakes deterministic
 detections/embeddings per filename with no model weights, and is what a
-plain dev machine should use. Real inference needs `uv sync --extra ml` plus
-GPU env vars — see `inference/README.md` for the CUDA/DeepSeek-OCR-2/
-insightface specifics if you're touching that code.
+plain dev machine should use. `INFERENCE_MOCK=false` runs real on-device
+inference (onnxruntime, no torch/CUDA needed) -- see `inference/README.md`
+for the execution-provider/tiered-OCR details, and the CUDA/DeepSeek-OCR-2
+`ml` extra if you're touching that specific tier.
 
 There is no automated test suite in this repo yet.
 
 Each service needs its own `.env` (copy from the adjacent `.env.example`):
-`server/.env` and `inference/.env`. The server refuses to boot without
-`SEARCHIT_WATCH_DIR` / `SEARCHIT_PREVIEW_DIR` / `SEARCHIT_FACE_THUMBNAIL_DIR`
-set.
+`server/.env` and `inference/.env`. The server no longer requires
+`DATABASE_URL` (defaults to an embedded PGlite database under
+`SEARCHIT_DB_DIR`) but still refuses to boot without `SEARCHIT_WATCH_DIR` /
+`SEARCHIT_PREVIEW_DIR` / `SEARCHIT_FACE_THUMBNAIL_DIR` set.
 
 ## Architecture
 
@@ -113,8 +135,11 @@ region-select "find similar"), pending new-location, etc. Every component
 under `src/components/` is presentational and talks back through callback
 props; all network access goes through `src/lib/api.ts`, a thin fetch wrapper
 against a **runtime-configurable** API base URL persisted in `localStorage`
-(`src/lib/settings.ts`) — the desktop client is expected to point at a
-different machine's server, not always `localhost`.
+(`src/lib/settings.ts`). On launch, `App.tsx` overwrites it with the bundled
+server sidecar's actual dynamically-chosen port (via the `get_backend_url`
+Tauri command) before making any API call; the manual override in the header
+input remains for the power-user case of pointing at a different machine's
+server instead of the local bundled one.
 
 Photos/events/locations/identities are kept fresh by silent polling
 (`POLL_INTERVAL_MS` in `App.tsx`, `PENDING_POLL_INTERVAL_MS` in
@@ -132,22 +157,59 @@ for translating the shared `PhotoStatus` enum. Locale is persisted to
 
 ### Tauri specifics (src-tauri/)
 
-Native commands (e.g. reveal-in-file-manager) live in `src-tauri/src/lib.rs`
-and are invoked from `src/lib/tauri.ts`. Auto-update uses
-`tauri-plugin-updater`: the signing keypair lives outside git
+Native commands (e.g. reveal-in-file-manager, `get_backend_url`,
+`set_watch_dir`) live in `src-tauri/src/lib.rs` and are invoked from
+`src/lib/tauri.ts`. `setup()` spawns both backend services as sidecars on
+launch:
+
+- **Server sidecar**: registered as a Tauri `externalBin` ("bun-server", a
+  copy of the Bun runtime staged by `scripts/fetch-bun-sidecar.mjs`), run
+  against a self-contained copy of `server/` staged by
+  `scripts/bundle-server.mjs` and shipped as a Tauri *resource* (not compiled
+  into the sidecar binary itself — `sharp`'s native addon and PGlite's
+  pgvector extension both resolve real filesystem paths at runtime that don't
+  survive `bun build --compile`'s single-file embedding).
+- **Inference sidecar**: PyInstaller-built by `scripts/bundle-inference.mjs`
+  into a onedir bundle, also shipped as a resource (not `externalBin` — a
+  PyInstaller onedir output is a whole folder, not the single portable
+  executable that convention expects) and spawned by its exact path via
+  `app.shell().command(...)`.
+
+Both bind to OS-assigned free ports; the server's is exposed to the frontend
+via the `get_backend_url` command (`src/App.tsx` resolves it before any API
+call, since the hardcoded `localhost:3001` default in `src/lib/settings.ts` is
+only a fallback for plain-browser dev). The main window starts hidden
+(`"visible": false"` in `tauri.conf.json`) until both sidecars' ports respond
+or a timeout elapses, and both are killed on `RunEvent::Exit`.
+`set_watch_dir` (paired with a native folder picker via `tauri-plugin-dialog`)
+restarts just the server sidecar against a new watch folder, since the server
+has no API to change it at runtime.
+
+Auto-update uses `tauri-plugin-updater`: the signing keypair lives outside git
 (`src-tauri/.updater.key`, gitignored — the private key + password are
 GitHub Actions secrets, not committed), the public key + update endpoint are
 in `tauri.conf.json`, the check/install flow is `src/lib/updater.ts`, and
 `.github/workflows/release.yml` builds/signs/publishes a **draft** GitHub
 release with a `latest.json` manifest on any `v*.*.*` tag push (the draft
 must be published manually before the updater endpoint will see it as
-"latest").
+"latest"). The release matrix covers Windows (signed) and macOS Apple Silicon
+(unsigned — no Apple Developer account/notarization yet; users open it once
+via right-click > Open to get past Gatekeeper).
 
 ### Database
 
-Postgres + `pgvector`, Drizzle ORM (`server/src/db/schema.ts`), migrations in
-`server/drizzle/`. `identities`/`faceEmbeddings`/`imageEmbeddings` exist from
-the first migration even though they were added for a later phase, so later
-phases wouldn't need destructive schema changes. Embedding columns are
-`vector(512)` (ArcFace for faces, CLIP for images) — both inference paths
-happen to share the dimension, but they are not comparable to each other.
+Embedded **PGlite** (Postgres-in-WASM) by default — `server/src/db/client.ts`
+picks this backend whenever `DATABASE_URL` is unset, storing data under
+`SEARCHIT_DB_DIR`, with pgvector support via the separate
+`@electric-sql/pglite-pgvector` package (the extension moved out of PGlite's
+core package in more recent versions). Setting `DATABASE_URL` switches to a
+real external Postgres instead (`drizzle-orm/postgres-js`) — the
+`docker-compose.yml` dev loop from before this database was embedded. Either
+way it's Drizzle ORM (`server/src/db/schema.ts`), migrations in
+`server/drizzle/`, applied automatically on server boot
+(`runMigrations()` in `client.ts`) as well as via `bun run db:migrate`.
+`identities`/`faceEmbeddings`/`imageEmbeddings` exist from the first
+migration even though they were added for a later phase, so later phases
+wouldn't need destructive schema changes. Embedding columns are `vector(512)`
+(ArcFace for faces, CLIP for images) — both inference paths happen to share
+the dimension, but they are not comparable to each other.

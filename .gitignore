@@ -27,6 +27,7 @@ dist-ssr
 server/.env
 inference/.env
 inference/.venv
+inference/.build-venv
 inference/__pycache__
 inference/**/__pycache__
 inference/.ocr_scratch
@@ -38,6 +39,10 @@ data/
 # Tauri updater signing key -- never commit, store in GitHub Actions secrets instead
 src-tauri/.updater.key
 src-tauri/.updater.key.pub
+
+# Staged sidecar resources/binaries, rebuilt by scripts/bundle-server.mjs and CI
+src-tauri/resources-staging/
+src-tauri/binaries/
 
 # Claude Code local runtime state (session locks, not shared config)
 .claude/

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
+import { runMigrations } from "./db/client";
 import { checkInferenceHealth } from "./inference/client";
 import { startWatcher } from "./ingest/watcher";
 import { eventsRoutes } from "./routes/events";
@@ -12,7 +13,10 @@ import { photosRoutes } from "./routes/photos";
 import { searchRoutes } from "./routes/search";
 
 const PORT = Number(process.env.PORT ?? 3001);
-const HOST = process.env.HOST ?? "0.0.0.0";
+// Defaults to loopback-only: the bundled desktop build runs its own server
+// per device and has no reason to accept remote connections. Dev setups that
+// want LAN access can still set HOST=0.0.0.0 explicitly.
+const HOST = process.env.HOST ?? "127.0.0.1";
 const WATCH_DIR_CONFIG = process.env.SEARCHIT_WATCH_DIR;
 const PREVIEW_DIR_CONFIG = process.env.SEARCHIT_PREVIEW_DIR;
 const FACE_THUMBNAIL_DIR_CONFIG = process.env.SEARCHIT_FACE_THUMBNAIL_DIR;
@@ -34,6 +38,10 @@ const FACE_THUMBNAIL_DIR = path.resolve(FACE_THUMBNAIL_DIR_CONFIG);
 await mkdir(WATCH_DIR, { recursive: true });
 await mkdir(PREVIEW_DIR, { recursive: true });
 await mkdir(FACE_THUMBNAIL_DIR, { recursive: true });
+
+// Self-initializes the schema on first boot -- a fresh device has no chance
+// to have run `db:migrate` by hand beforehand.
+await runMigrations();
 
 const app = new Elysia()
   .use(cors())

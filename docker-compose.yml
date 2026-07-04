@@ -1,3 +1,6 @@
+# Optional: the server embeds PGlite by default (no external Postgres
+# needed). This is only for the DATABASE_URL dev escape hatch -- set
+# DATABASE_URL to point server/.env at this instead of the embedded database.
 services:
   postgres:
     image: pgvector/pgvector:pg16

@@ -15,6 +15,10 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
+          # Apple Silicon only for now -- unsigned (no Apple Developer
+          # account/notarization yet, see inference/README.md and AGENTS.md).
+          # Users open it once via right-click > Open to get past Gatekeeper.
+          - platform: macos-14
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +28,13 @@ jobs:
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
+
+      # Builds the inference sidecar (scripts/bundle-inference.mjs, run
+      # automatically via tauri.conf.json's beforeBuildCommand).
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
 
       - name: Install frontend dependencies
         run: bun install

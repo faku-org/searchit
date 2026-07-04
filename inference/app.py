@@ -136,6 +136,20 @@ def embed_text_endpoint(body: EmbedTextRequest) -> EmbedTextResponse:
     return EmbedTextResponse(embedding=embed_text(body.text))
 
 
+def _use_deepseek_ocr(settings) -> bool:
+    """DeepSeek-OCR-2 is the higher-quality tier, but it's torch+CUDA only
+    (see inference/README.md) -- only usable on a box with the `ml` extra
+    installed and a working NVIDIA GPU. Everywhere else (desktop client
+    machines) falls back to OS-native/ONNX OCR in ocr_native.py."""
+    if not settings.ocr_model_path:
+        return False
+    try:
+        import torch
+    except ImportError:
+        return False
+    return torch.cuda.is_available()
+
+
 @app.post("/read-scene-text", response_model=ReadSceneTextResponse)
 def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextResponse:
     settings = get_settings()
@@ -146,7 +160,10 @@ def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextRespons
     if settings.inference_mock:
         return ReadSceneTextResponse(text=_mock_scene_text(image_path))
 
-    from ocr import read_scene_text
+    if _use_deepseek_ocr(settings):
+        from ocr import read_scene_text
+    else:
+        from ocr_native import read_scene_text
 
     with Image.open(image_path) as img:
         text = read_scene_text(img.convert("RGB"))

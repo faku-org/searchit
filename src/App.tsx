@@ -31,6 +31,11 @@ import {
 import { useTranslation } from "./lib/i18n";
 import { getApiBaseUrl, setApiBaseUrl } from "./lib/settings";
 import {
+  getBackendUrl,
+  pickWatchFolder,
+  setWatchDir as setServerWatchDir,
+} from "./lib/tauri";
+import {
   checkForUpdate,
   installPendingUpdate,
   type UpdateInfo,
@@ -83,6 +88,7 @@ function App() {
   );
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
+  const [isBackendUrlResolved, setIsBackendUrlResolved] = useState(false);
 
   function refreshEvents(options?: { silent?: boolean }) {
     getEvents()
@@ -100,17 +106,40 @@ function App() {
       });
   }
 
+  // The bundled server sidecar binds to a free port chosen at launch, so the
+  // hardcoded default in settings.ts is only a guess -- ask Rust for the real
+  // URL before making any API calls. Rejects when not running inside the
+  // Tauri shell (e.g. `bun run dev` in a plain browser), which just keeps
+  // whatever's already configured.
+  useEffect(() => {
+    let cancelled = false;
+    getBackendUrl()
+      .then((url) => {
+        if (cancelled) return;
+        setApiBaseUrl(url);
+        setApiBaseUrlInput(url);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsBackendUrlResolved(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Show every photo by default -- otherwise the grid stays empty until the
   // user submits the filter form at least once, even though no filters
   // means "match everything" on the server.
   useEffect(() => {
+    if (!isBackendUrlResolved) return;
     refreshEvents();
     refreshLocations();
     void runSearch();
     getConfig()
       .then((config) => setWatchDir(config.watchDir))
       .catch(() => setWatchDir(null));
-  }, []);
+  }, [isBackendUrlResolved]);
 
   // The server ingests new photos in the background (folder watcher +
   // inference pipeline), and other clients may create events/locations at
@@ -250,6 +279,18 @@ function App() {
     }
   }
 
+  async function handleChangeWatchDir() {
+    const picked = await pickWatchFolder();
+    if (!picked) return;
+    setError(null);
+    try {
+      await setServerWatchDir(picked);
+      setWatchDir(picked);
+    } catch {
+      setError(t("header.changeWatchDirError"));
+    }
+  }
+
   return (
     <main className="flex h-screen flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
@@ -343,8 +384,17 @@ function App() {
       </header>
 
       {watchDir && (
-        <p className="truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
-          {t("header.watchDir", { path: watchDir })}
+        <p className="flex items-center gap-2 truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
+          <span className="truncate">
+            {t("header.watchDir", { path: watchDir })}
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleChangeWatchDir()}
+            className="shrink-0 rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          >
+            {t("header.changeWatchDir")}
+          </button>
         </p>
       )}
 
