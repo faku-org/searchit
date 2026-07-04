@@ -1,7 +1,7 @@
 import { unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { and, desc, eq, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type {
   BackfillResponseBody,
@@ -311,12 +311,19 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
     // Absence of an image_embeddings row reliably means "never touched by the
     // current full pipeline" (that table is always populated 1:1 once a photo
     // goes through it), which is exactly the class of photo ingested before a
-    // later phase (faces, CLIP) existed.
+    // later phase (faces, CLIP) existed. A null takenAt catches the same kind
+    // of "ingested before a later fix" photo for the EXIF/filesystem date
+    // fallback specifically -- reprocessPhoto re-derives it when missing.
     const candidates = await db
       .select({ id: photos.id, previewPath: photos.previewPath })
       .from(photos)
       .leftJoin(imageEmbeddings, eq(imageEmbeddings.photoId, photos.id))
-      .where(and(eq(photos.status, "processed"), isNull(imageEmbeddings.id)));
+      .where(
+        and(
+          eq(photos.status, "processed"),
+          or(isNull(imageEmbeddings.id), isNull(photos.takenAt)),
+        ),
+      );
 
     const reprocessable = candidates.filter(
       (candidate): candidate is { id: string; previewPath: string } =>

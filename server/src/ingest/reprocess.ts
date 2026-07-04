@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { photos } from "../db/schema";
+import { readExif } from "./exif";
 import { generatePreview } from "./preview";
 import { runInferencePipeline } from "./pipeline";
 import { runExclusive } from "./queue";
@@ -43,6 +44,20 @@ async function reprocessPhotoInternal(
     .where(eq(photos.id, photoId));
 
   try {
+    // Photos ingested before the filesystem-date fallback existed (or whose
+    // EXIF read failed transiently) were left with a permanently null
+    // takenAt, since ingest only runs once per file. Re-derive it here so
+    // reprocess/backfill can heal them without re-ingesting.
+    if (!photo.takenAt) {
+      const exif = await readExif(photo.originalPath);
+      if (exif.takenAt) {
+        await db
+          .update(photos)
+          .set({ takenAt: exif.takenAt, takenAtSource: exif.takenAtSource })
+          .where(eq(photos.id, photoId));
+      }
+    }
+
     let previewPath = photo.previewPath;
     if (!previewPath) {
       const preview = await generatePreview(
