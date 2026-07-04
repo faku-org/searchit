@@ -9,10 +9,13 @@ dependencies = [
   "pydantic-settings>=2.6",
   "pillow>=11.0",
   # Real on-device inference for faces + CLIP, everywhere, with no
-  # torch/CUDA needed: insightface and the CLIP embedder both run on plain
-  # onnxruntime (see config.get_execution_providers). CPU always works; the
-  # `directml` extra below adds Windows GPU accel, and macOS's onnxruntime
-  # wheel already bundles the CoreML execution provider.
+  # torch/CUDA needed: insightface and the CLIP embedder both run on
+  # onnxruntime (see config.get_execution_providers). This is always the
+  # plain CPU-only wheel, even on a `directml`/`ml` sync below -- insightface
+  # itself hard-depends on plain `onnxruntime` regardless of extras, and it
+  # shares its import path with the GPU variants, so whichever's files
+  # physically win on disk decides what actually runs. See the `directml`
+  # extra's comment for the force-reinstall step that makes GPU actually win.
   "onnxruntime>=1.19",
   "insightface>=0.7",
   # CLIPImageProcessor/CLIPTokenizerFast only (pre/post-processing, not the
@@ -30,10 +33,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Windows GPU acceleration (any DX12 GPU, not just NVIDIA) for the onnxruntime
-# EP path. Same import name as the base `onnxruntime` package -- installing
-# this replaces it rather than adding to it, so it's opt-in per machine
-# rather than a base dependency.
+# Windows GPU acceleration (any DX12 GPU, not just NVIDIA). Installing this
+# extra does NOT get you DirectML on its own -- `onnxruntime` above is a hard
+# dependency of insightface too, so both wheels end up installed and
+# whichever wins the shared `onnxruntime/` package directory decides what you
+# actually run. Force-reinstalling this one last (after `uv sync --extra
+# directml`) makes it win:
+#
+#   uv pip install --reinstall --no-deps onnxruntime-directml
+#
+# `scripts/bundle-inference.mjs` does this automatically for Windows sidecar
+# builds; see inference/README.md for the manual dev-box version.
 directml = ["onnxruntime-directml>=1.19"]
 
 # Only needed on the machine that actually runs the higher-quality
@@ -53,13 +63,16 @@ ml = [
   "einops",
   "addict",
   "easydict",
-  # Same import name as the base `onnxruntime` package -- this replaces it
-  # so insightface also gets CUDA acceleration on this box.
+  # Same import name/shared-directory caveat as the `directml` extra above --
+  # this is the CUDA-accelerated one, for insightface + CLIP on this box.
+  # Force-reinstall it last too if `onnxruntime`'s plain CPU wheel wins:
+  # `uv pip install --reinstall --no-deps onnxruntime-gpu`.
   "onnxruntime-gpu>=1.19",
 ]
 
 [tool.uv]
 package = false
+conflicts = [[{ extra = "directml" }, { extra = "ml" }]]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cu128" }]

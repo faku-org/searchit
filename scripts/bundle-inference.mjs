@@ -54,10 +54,23 @@ function run(cmd, opts = {}) {
 }
 
 console.log("Syncing inference build environment...");
-run(["uv", "sync"], {
+const uvSyncEnv = { ...process.env, UV_PROJECT_ENVIRONMENT: buildVenvDir };
+run(["uv", "sync", "--extra", isWindows ? "directml" : "cpu"], {
   cwd: inferenceDir,
-  env: { ...process.env, UV_PROJECT_ENVIRONMENT: buildVenvDir },
+  env: uvSyncEnv,
 });
+if (isWindows) {
+  // insightface hard-depends on plain `onnxruntime` (CPU-only), which shares
+  // its import path with `onnxruntime-directml` -- `uv sync --extra directml`
+  // above installs both, and insightface's transitive requirement wins the
+  // shared `onnxruntime/` package directory, silently leaving the sidecar on
+  // CPU. Force-reinstalling the directml wheel last overwrites those files
+  // so it's what actually gets imported as `onnxruntime` at runtime.
+  run(
+    ["uv", "pip", "install", "--reinstall", "--no-deps", "onnxruntime-directml"],
+    { cwd: inferenceDir, env: uvSyncEnv },
+  );
+}
 run(["uv", "pip", "install", "--python", buildVenvDir, "pyinstaller"], {
   cwd: inferenceDir,
 });

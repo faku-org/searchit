@@ -27,8 +27,27 @@ testable without GPU weights, not just the ingest plumbing.
 ## Real inference, on-device (the desktop client default)
 
 With `INFERENCE_MOCK=false` and no `OCR_MODEL_PATH` configured, every endpoint
-runs a real model, entirely on plain `onnxruntime` -- no torch, no CUDA
-required:
+runs a real model, entirely on onnxruntime -- no torch, no CUDA required.
+`onnxruntime` (the plain CPU-only wheel) is a base dependency via
+`insightface`, so a bare `uv sync` already gets you real inference on CPU,
+CoreML on macOS included (that wheel bundles CoreML for free). Windows GPU
+(DirectML, any DX12 GPU) is opt-in:
+
+```
+uv sync --extra directml
+uv pip install --reinstall --no-deps onnxruntime-directml
+```
+
+The second line matters: `insightface` hard-depends on plain `onnxruntime`
+regardless of extras, and it shares its import path with
+`onnxruntime-directml`, so `uv sync --extra directml` alone ends up with
+*both* wheels installed side by side -- whichever wins the shared
+`onnxruntime/` directory on disk decides what actually runs, silently, with
+no error. Force-reinstalling DirectML last makes it win. Confirm via
+`GET /health`'s `providers` field rather than assuming.
+`scripts/bundle-inference.mjs` does this automatically for Windows sidecar
+builds; it's only a manual step for a Windows dev box running `inference/`
+directly.
 
 - **Faces** (`faces.py`): `insightface`'s `buffalo_l` pack (detector + ArcFace
   512-dim embeddings), auto-downloaded into `MODEL_CACHE_DIR` on first use.
@@ -45,16 +64,7 @@ required:
 execution provider at runtime (`ort.get_available_providers()`), in this
 order: CUDA (if the `ml` extra's `onnxruntime-gpu` is installed and a CUDA GPU
 is present) > the platform's native accelerator (CoreML on macOS,
-`DmlExecutionProvider` on Windows if the `directml` extra is installed) > CPU.
-Windows GPU acceleration is opt-in because it needs a different, mutually
-exclusive `onnxruntime` build:
-
-```
-uv sync --extra directml
-```
-
-(macOS needs no extra install -- the standard `onnxruntime` wheel already
-bundles the CoreML execution provider.)
+`DmlExecutionProvider` on Windows) > CPU.
 
 The Apple Vision path in `ocr_native.py` is written against Apple's documented
 Vision APIs but hasn't been run on an actual Mac yet -- re-verify it there

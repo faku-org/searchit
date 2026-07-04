@@ -3,6 +3,7 @@ import { db } from "../db/client";
 import { photos } from "../db/schema";
 import { generatePreview } from "./preview";
 import { runInferencePipeline } from "./pipeline";
+import { runExclusive } from "./queue";
 
 /**
  * Re-runs a photo through the full pipeline: regenerates the preview first if
@@ -11,8 +12,22 @@ import { runInferencePipeline } from "./pipeline";
  * manual "reprocess" button, and "retry all failed" -- always resets status to
  * `pending` and clears any prior `errorMessage` first, so a previously-failed
  * photo isn't stuck failed forever just because reprocessing failed to run.
+ *
+ * Runs exclusively per photoId (see queue.ts's runExclusive) since those three
+ * callers can otherwise trigger overlapping runs for the same photo, racing
+ * runInferencePipeline's delete-then-insert against itself.
  */
-export async function reprocessPhoto(
+export function reprocessPhoto(
+  photoId: string,
+  previewDir: string,
+  faceThumbnailDir: string,
+): Promise<void> {
+  return runExclusive(photoId, () =>
+    reprocessPhotoInternal(photoId, previewDir, faceThumbnailDir),
+  );
+}
+
+async function reprocessPhotoInternal(
   photoId: string,
   previewDir: string,
   faceThumbnailDir: string,

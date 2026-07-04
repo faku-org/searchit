@@ -67,3 +67,25 @@ export function getQueueStats(): IngestQueueStats {
 export function getIngestConcurrency(): number {
   return CONCURRENCY;
 }
+
+const activeByKey = new Map<string, Promise<void>>();
+
+/**
+ * Runs `task` exclusively per `key`: a second call for a key already in
+ * flight joins the same promise instead of running concurrently. Used to
+ * stop two reprocess triggers for the same photo (fresh ingest, manual
+ * reprocess, "retry all failed") from racing runInferencePipeline's
+ * delete-then-insert and hitting image_embeddings_photo_id_unique. Doesn't
+ * touch the bounded worker pool above, so it's safe to call from within an
+ * already-running queued task.
+ */
+export function runExclusive(key: string, task: () => Promise<void>): Promise<void> {
+  const existing = activeByKey.get(key);
+  if (existing) return existing;
+
+  const promise = task().finally(() => {
+    if (activeByKey.get(key) === promise) activeByKey.delete(key);
+  });
+  activeByKey.set(key, promise);
+  return promise;
+}

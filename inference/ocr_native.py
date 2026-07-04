@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from PIL.Image import Image
 
 _rapidocr_engine = None
+_windows_ocr_engine = None
+_windows_ocr_engine_loaded = False
 
 
 def read_scene_text(image: "Image") -> str:
@@ -25,13 +27,29 @@ def read_scene_text(image: "Image") -> str:
     return _read_with_rapidocr(image)
 
 
+def _get_windows_ocr_engine():
+    # Recreating OcrEngine per call (as this used to) churns a WinRT/COM
+    # object on every photo in a batch instead of once -- unlike every other
+    # engine in this module/service, which is cached as a singleton.
+    global _windows_ocr_engine, _windows_ocr_engine_loaded
+    if not _windows_ocr_engine_loaded:
+        from winsdk.windows.media.ocr import OcrEngine
+
+        _windows_ocr_engine = OcrEngine.try_create_from_user_profile_languages()
+        _windows_ocr_engine_loaded = True
+    return _windows_ocr_engine
+
+
 def _read_with_windows_ocr(image: "Image") -> str:
     import asyncio
     import io
 
     from winsdk.windows.graphics.imaging import BitmapDecoder
-    from winsdk.windows.media.ocr import OcrEngine
     from winsdk.windows.storage.streams import DataWriter, InMemoryRandomAccessStream
+
+    engine = _get_windows_ocr_engine()
+    if engine is None:
+        return ""
 
     async def _recognize() -> str:
         buf = io.BytesIO()
@@ -47,9 +65,6 @@ def _read_with_windows_ocr(image: "Image") -> str:
         decoder = await BitmapDecoder.create_async(stream)
         bitmap = await decoder.get_software_bitmap_async()
 
-        engine = OcrEngine.try_create_from_user_profile_languages()
-        if engine is None:
-            return ""
         result = await engine.recognize_async(bitmap)
         return result.text
 
