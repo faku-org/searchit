@@ -7,7 +7,6 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 conflicts = [[
-    { package = "searchit-inference", extra = "cpu" },
     { package = "searchit-inference", extra = "directml" },
     { package = "searchit-inference", extra = "ml" },
 ]]
@@ -51,7 +50,7 @@ version = "4.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3b/72/5562aabb8dd7181e8e860622a38bea08d17842b99ecd4c91f84ac95251b0/anyio-4.14.1.tar.gz", hash = "sha256:8d648a3544c1a700e3ff78615cd679e4c5c3f149904287e73687b2596963629e", size = 254831, upload-time = "2026-06-24T20:56:06.017Z" }
 wheels = [
@@ -161,7 +160,7 @@ name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
 wheels = [
@@ -182,7 +181,7 @@ name = "colorlog"
 version = "6.10.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a2/61/f083b5ac52e505dfc1c624eafbf8c7589a0d7f32daa398d2e7590efa5fda/colorlog-6.10.1.tar.gz", hash = "sha256:eb4ae5cb65fe7fec7773c2306061a8e63e02efc2c72eba9d27b0fa23c94f1321", size = 17162, upload-time = "2025-10-16T16:14:11.978Z" }
 wheels = [
@@ -419,7 +418,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "packaging" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -445,8 +444,8 @@ name = "imageio"
 version = "2.37.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "pillow" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b1/84/93bcd1300216ea50811cee96873b84a1bebf8d0489ffaf7f2a3756bab866/imageio-2.37.3.tar.gz", hash = "sha256:bbb37efbfc4c400fcd534b367b91fcd66d5da639aaa138034431a1c5e0a41451", size = 389673, upload-time = "2026-03-09T11:31:12.573Z" }
@@ -459,15 +458,15 @@ name = "insightface"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "onnx" },
     { name = "onnxruntime" },
     { name = "opencv-python" },
     { name = "requests" },
     { name = "scikit-image" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f0/77/a1b06d3755fcfb353cdd46a138ec578d9664ee8b53590e73e9edca328928/insightface-1.0.1.tar.gz", hash = "sha256:27af24891bbba470cb3573b366a0fcca8989fc8503c9f8f281e8cba6fd716075", size = 721597, upload-time = "2026-05-23T06:43:00.404Z" }
@@ -578,8 +577,8 @@ name = "ml-dtypes"
 version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/4a/c27b42ed9b1c7d13d9ba8b6905dece787d6259152f2309338aed29b2447b/ml_dtypes-0.5.4.tar.gz", hash = "sha256:8ab06a50fb9bf9666dd0fe5dfb4676fa2b0ac0f31ecff72a6c3af8e22c063453", size = 692314, upload-time = "2025-11-17T22:32:31.031Z" }
 wheels = [
@@ -950,8 +949,8 @@ version = "1.22.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ml-dtypes" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "protobuf" },
     { name = "typing-extensions" },
 ]
@@ -983,8 +982,8 @@ version = "1.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flatbuffers" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "packaging" },
     { name = "protobuf" },
 ]
@@ -1021,8 +1020,8 @@ version = "1.24.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flatbuffers" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "packaging" },
     { name = "protobuf" },
     { name = "sympy" },
@@ -1040,8 +1039,8 @@ version = "1.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flatbuffers" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "packaging" },
     { name = "protobuf" },
 ]
@@ -1063,8 +1062,8 @@ name = "opencv-python"
 version = "5.0.0.93"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/79/4c/a438d23e09ce2033c09f7b784ad2fbdb0adf529e434101ed28f142226f98/opencv_python-5.0.0.93.tar.gz", hash = "sha256:66aac3e5b5faa48d4025816592f3af19e4bfc2c68dec067bae2dbb4ca10aa9e2", size = 81802749, upload-time = "2026-07-02T06:59:53.815Z" }
 wheels = [
@@ -1185,6 +1184,34 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d8/bc/6d6c7ba8709c85f8f2c390b2b118d6fb08a783676a572271851bf45a7d22/protobuf-7.35.1-cp310-abi3-win32.whl", hash = "sha256:353652e4efd0bca5b5fc2656abf8307ef351f0cf938c9eba09f0e09c20a25c30", size = 428945, upload-time = "2026-06-11T21:55:37.034Z" },
     { url = "https://files.pythonhosted.org/packages/0a/19/8d0cb6f20a1ef7b18f1c8986ad5783f22f84cce39c6ce9a6e645ea55192e/protobuf-7.35.1-cp310-abi3-win_amd64.whl", hash = "sha256:230a75ddfc2de4806e56696ce9640c1cdfdb6543b7cfce98d42a4c0a0e7bdb87", size = 439996, upload-time = "2026-06-11T21:55:38.123Z" },
     { url = "https://files.pythonhosted.org/packages/19/c7/5f7c636ec43e0c545e28d1f1db71990108306f7bdcb89f069ba97e428e7f/protobuf-7.35.1-py3-none-any.whl", hash = "sha256:4bc97768d8fe4ad6743c8a19403e314511ed9f6d13205b687e52421c023ac1b9", size = 171659, upload-time = "2026-06-11T21:55:39.155Z" },
+]
+
+[[package]]
+name = "psutil"
+version = "7.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/c6/d1ddf4abb55e93cebc4f2ed8b5d6dbad109ecb8d63748dd2b20ab5e57ebe/psutil-7.2.2.tar.gz", hash = "sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372", size = 493740, upload-time = "2026-01-28T18:14:54.428Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/08/510cbdb69c25a96f4ae523f733cdc963ae654904e8db864c07585ef99875/psutil-7.2.2-cp313-cp313t-macosx_10_13_x86_64.whl", hash = "sha256:2edccc433cbfa046b980b0df0171cd25bcaeb3a68fe9022db0979e7aa74a826b", size = 130595, upload-time = "2026-01-28T18:14:57.293Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/f5/97baea3fe7a5a9af7436301f85490905379b1c6f2dd51fe3ecf24b4c5fbf/psutil-7.2.2-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:e78c8603dcd9a04c7364f1a3e670cea95d51ee865e4efb3556a3a63adef958ea", size = 131082, upload-time = "2026-01-28T18:14:59.732Z" },
+    { url = "https://files.pythonhosted.org/packages/37/d6/246513fbf9fa174af531f28412297dd05241d97a75911ac8febefa1a53c6/psutil-7.2.2-cp313-cp313t-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1a571f2330c966c62aeda00dd24620425d4b0cc86881c89861fbc04549e5dc63", size = 181476, upload-time = "2026-01-28T18:15:01.884Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/b5/9182c9af3836cca61696dabe4fd1304e17bc56cb62f17439e1154f225dd3/psutil-7.2.2-cp313-cp313t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:917e891983ca3c1887b4ef36447b1e0873e70c933afc831c6b6da078ba474312", size = 184062, upload-time = "2026-01-28T18:15:04.436Z" },
+    { url = "https://files.pythonhosted.org/packages/16/ba/0756dca669f5a9300d0cbcbfae9a4c30e446dfc7440ffe43ded5724bfd93/psutil-7.2.2-cp313-cp313t-win_amd64.whl", hash = "sha256:ab486563df44c17f5173621c7b198955bd6b613fb87c71c161f827d3fb149a9b", size = 139893, upload-time = "2026-01-28T18:15:06.378Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/61/8fa0e26f33623b49949346de05ec1ddaad02ed8ba64af45f40a147dbfa97/psutil-7.2.2-cp313-cp313t-win_arm64.whl", hash = "sha256:ae0aefdd8796a7737eccea863f80f81e468a1e4cf14d926bd9b6f5f2d5f90ca9", size = 135589, upload-time = "2026-01-28T18:15:08.03Z" },
+    { url = "https://files.pythonhosted.org/packages/81/69/ef179ab5ca24f32acc1dac0c247fd6a13b501fd5534dbae0e05a1c48b66d/psutil-7.2.2-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:eed63d3b4d62449571547b60578c5b2c4bcccc5387148db46e0c2313dad0ee00", size = 130664, upload-time = "2026-01-28T18:15:09.469Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/64/665248b557a236d3fa9efc378d60d95ef56dd0a490c2cd37dafc7660d4a9/psutil-7.2.2-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:7b6d09433a10592ce39b13d7be5a54fbac1d1228ed29abc880fb23df7cb694c9", size = 131087, upload-time = "2026-01-28T18:15:11.724Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/2e/e6782744700d6759ebce3043dcfa661fb61e2fb752b91cdeae9af12c2178/psutil-7.2.2-cp314-cp314t-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1fa4ecf83bcdf6e6c8f4449aff98eefb5d0604bf88cb883d7da3d8d2d909546a", size = 182383, upload-time = "2026-01-28T18:15:13.445Z" },
+    { url = "https://files.pythonhosted.org/packages/57/49/0a41cefd10cb7505cdc04dab3eacf24c0c2cb158a998b8c7b1d27ee2c1f5/psutil-7.2.2-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e452c464a02e7dc7822a05d25db4cde564444a67e58539a00f929c51eddda0cf", size = 185210, upload-time = "2026-01-28T18:15:16.002Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/2c/ff9bfb544f283ba5f83ba725a3c5fec6d6b10b8f27ac1dc641c473dc390d/psutil-7.2.2-cp314-cp314t-win_amd64.whl", hash = "sha256:c7663d4e37f13e884d13994247449e9f8f574bc4655d509c3b95e9ec9e2b9dc1", size = 141228, upload-time = "2026-01-28T18:15:18.385Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/fc/f8d9c31db14fcec13748d373e668bc3bed94d9077dbc17fb0eebc073233c/psutil-7.2.2-cp314-cp314t-win_arm64.whl", hash = "sha256:11fe5a4f613759764e79c65cf11ebdf26e33d6dd34336f8a337aa2996d71c841", size = 136284, upload-time = "2026-01-28T18:15:19.912Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/36/5ee6e05c9bd427237b11b3937ad82bb8ad2752d72c6969314590dd0c2f6e/psutil-7.2.2-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:ed0cace939114f62738d808fdcecd4c869222507e266e574799e9c0faa17d486", size = 129090, upload-time = "2026-01-28T18:15:22.168Z" },
+    { url = "https://files.pythonhosted.org/packages/80/c4/f5af4c1ca8c1eeb2e92ccca14ce8effdeec651d5ab6053c589b074eda6e1/psutil-7.2.2-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:1a7b04c10f32cc88ab39cbf606e117fd74721c831c98a27dc04578deb0c16979", size = 129859, upload-time = "2026-01-28T18:15:23.795Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/70/5d8df3b09e25bce090399cf48e452d25c935ab72dad19406c77f4e828045/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9", size = 155560, upload-time = "2026-01-28T18:15:25.976Z" },
+    { url = "https://files.pythonhosted.org/packages/63/65/37648c0c158dc222aba51c089eb3bdfa238e621674dc42d48706e639204f/psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b0726cecd84f9474419d67252add4ac0cd9811b04d61123054b9fb6f57df6e9e", size = 156997, upload-time = "2026-01-28T18:15:27.794Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/13/125093eadae863ce03c6ffdbae9929430d116a246ef69866dad94da3bfbc/psutil-7.2.2-cp36-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8", size = 148972, upload-time = "2026-01-28T18:15:29.342Z" },
+    { url = "https://files.pythonhosted.org/packages/04/78/0acd37ca84ce3ddffaa92ef0f571e073faa6d8ff1f0559ab1272188ea2be/psutil-7.2.2-cp36-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b58fabe35e80b264a4e3bb23e6b96f9e45a3df7fb7eed419ac0e5947c61e47cc", size = 148266, upload-time = "2026-01-28T18:15:31.597Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/90/e2159492b5426be0c1fef7acba807a03511f97c5f86b3caeda6ad92351a7/psutil-7.2.2-cp37-abi3-win_amd64.whl", hash = "sha256:eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988", size = 137737, upload-time = "2026-01-28T18:15:33.849Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/c7/7bb2e321574b10df20cbde462a94e2b71d05f9bbda251ef27d104668306a/psutil-7.2.2-cp37-abi3-win_arm64.whl", hash = "sha256:8c233660f575a5a89e6d4cb65d9f938126312bca76d8fe087b947b3a1aaac9ee", size = 134617, upload-time = "2026-01-28T18:15:36.514Z" },
 ]
 
 [[package]]
@@ -1522,8 +1549,8 @@ version = "3.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorlog" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "omegaconf" },
     { name = "opencv-python" },
     { name = "pillow" },
@@ -1689,14 +1716,14 @@ dependencies = [
     { name = "imageio" },
     { name = "lazy-loader" },
     { name = "networkx" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "packaging" },
     { name = "pillow" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "tifffile", version = "2026.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "tifffile", version = "2026.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "tifffile", version = "2026.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "tifffile", version = "2026.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a1/b4/2528bb43c67d48053a7a649a9666432dc307d66ba02e3a6d5c40f46655df/scikit_image-0.26.0.tar.gz", hash = "sha256:f5f970ab04efad85c24714321fcc91613fcb64ef2a892a13167df2f3e59199fa", size = 22729739, upload-time = "2025-12-20T17:12:21.824Z" }
 wheels = [
@@ -1758,7 +1785,7 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7a/97/5a3609c4f8d58b039179648e62dd220f89864f56f7357f5d4f45c29eb2cc/scipy-1.17.1.tar.gz", hash = "sha256:95d8e012d8cb8816c226aef832200b1d45109ed4464303e997c5b13122b297c0", size = 30573822, upload-time = "2026-02-23T00:26:24.851Z" }
 wheels = [
@@ -1833,7 +1860,7 @@ resolution-markers = [
     "python_full_version == '3.12.*'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a7/25/c2700dfaf6442b4effaa91af24ebce5dc9d31bb4a69706313aae70d72cd0/scipy-1.18.0.tar.gz", hash = "sha256:67b2ad2ad54c72ca6d04975a9b2df8c3638c34ddd5b28738e94fc2b57929d378", size = 30774447, upload-time = "2026-06-19T15:01:43.456Z" }
 wheels = [
@@ -1889,19 +1916,17 @@ dependencies = [
     { name = "insightface" },
     { name = "onnxruntime" },
     { name = "pillow" },
+    { name = "psutil" },
     { name = "pydantic-settings" },
-    { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "rapidocr" },
     { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
-    { name = "winsdk", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "winsdk", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 
 [package.optional-dependencies]
-cpu = [
-    { name = "onnxruntime" },
-]
 directml = [
     { name = "onnxruntime-directml" },
 ]
@@ -1925,10 +1950,10 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=0.26" },
     { name = "insightface", specifier = ">=0.7" },
     { name = "onnxruntime", specifier = ">=1.19" },
-    { name = "onnxruntime", marker = "extra == 'cpu'", specifier = ">=1.19" },
     { name = "onnxruntime-directml", marker = "extra == 'directml'", specifier = ">=1.19" },
     { name = "onnxruntime-gpu", marker = "extra == 'ml'", specifier = ">=1.19" },
     { name = "pillow", specifier = ">=11.0" },
+    { name = "psutil", specifier = ">=6.0" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'" },
     { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin'" },
@@ -1941,7 +1966,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
     { name = "winsdk", marker = "sys_platform == 'win32'", specifier = ">=1.0.0b0" },
 ]
-provides-extras = ["cpu", "directml", "ml"]
+provides-extras = ["directml", "ml"]
 
 [[package]]
 name = "setuptools"
@@ -1957,8 +1982,8 @@ name = "shapely"
 version = "2.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4d/bc/0989043118a27cccb4e906a46b7565ce36ca7b57f5a18b78f4f1b0f72d9d/shapely-2.1.2.tar.gz", hash = "sha256:2ed4ecb28320a433db18a5bf029986aa8afcfd740745e78847e330d5d94922a9", size = 315489, upload-time = "2025-09-24T13:51:41.432Z" }
 wheels = [
@@ -2027,7 +2052,7 @@ version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
@@ -2054,7 +2079,7 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c5/cb/2f6d79c7576e22c116352a801f4c3c8ace5957e9aced862012430b62e14f/tifffile-2026.3.3.tar.gz", hash = "sha256:d9a1266bed6f2ee1dd0abde2018a38b4f8b2935cb843df381d70ac4eac5458b7", size = 388745, upload-time = "2026-03-03T19:14:38.134Z" }
 wheels = [
@@ -2070,7 +2095,7 @@ resolution-markers = [
     "python_full_version == '3.12.*'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b7/38/5e2ecef5af2f4fd4a89bb8d6240de9458bab4d51a4cbd97aeb3a0cd618e2/tifffile-2026.6.1.tar.gz", hash = "sha256:626c892c0e899d959b9438e7c0e1491dc154a7fead1f1f37a991724a50eceba9", size = 429694, upload-time = "2026-05-31T23:57:12.165Z" }
 wheels = [
@@ -2130,7 +2155,7 @@ version = "2.11.0+cu128"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
     { name = "cuda-bindings", marker = "sys_platform == 'linux'" },
-    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "cufile", "cupti", "curand", "cusolver", "cusparse", "nvjitlink", "nvrtc", "nvtx"], marker = "(sys_platform == 'linux' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "cufile", "cupti", "curand", "cusolver", "cusparse", "nvjitlink", "nvrtc", "nvtx"], marker = "(sys_platform == 'linux' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "filelock" },
     { name = "fsspec" },
     { name = "jinja2" },
@@ -2170,8 +2195,8 @@ name = "torchvision"
 version = "0.26.0+cu128"
 source = { registry = "https://download.pytorch.org/whl/cu128" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "pillow" },
     { name = "torch" },
 ]
@@ -2201,7 +2226,7 @@ name = "tqdm"
 version = "4.68.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/87/d7/0535a28b1f5f24f6612fb3ff1e89fb1a8d160fee0f976e0aa6803862134b/tqdm-4.68.3.tar.gz", hash = "sha256:00dfa48452b6b6cfae3dd9885636c23d3422d1ec97c66d96818cbd5e0821d482", size = 170596, upload-time = "2026-06-17T07:36:52.105Z" }
 wheels = [
@@ -2215,8 +2240,8 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "huggingface-hub" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "packaging" },
     { name = "pyyaml" },
     { name = "regex" },
@@ -2294,11 +2319,11 @@ wheels = [
 
 [package.optional-dependencies]
 standard = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "httptools" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (platform_python_implementation == 'PyPy' and extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (platform_python_implementation == 'PyPy' and extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (sys_platform == 'cygwin' and extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (sys_platform == 'cygwin' and extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (sys_platform == 'cygwin' and extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (sys_platform == 'win32' and extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-directml') or (sys_platform == 'win32' and extra == 'extra-18-searchit-inference-cpu' and extra == 'extra-18-searchit-inference-ml') or (sys_platform == 'win32' and extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
+    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (sys_platform == 'cygwin' and extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml') or (sys_platform == 'win32' and extra == 'extra-18-searchit-inference-directml' and extra == 'extra-18-searchit-inference-ml')" },
     { name = "watchfiles" },
     { name = "websockets" },
 ]

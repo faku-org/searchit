@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -100,6 +101,8 @@ def read_text(image: "Image") -> str:
     shows up in the scratch output dir. Re-verify against the installed model
     version once real weights are in place.
     """
+    import torch
+
     model, tokenizer = _load_model()
     settings = get_settings()
 
@@ -112,22 +115,26 @@ def read_text(image: "Image") -> str:
     image.save(image_path)
 
     try:
-        result = model.infer(
-            tokenizer,
-            prompt=OCR_PROMPT,
-            image_file=str(image_path),
-            output_path=str(output_dir),
-            base_size=1024,
-            # DeepSeek-OCR-2's encoder only supports two tile sizes -- 768
-            # (144 visual tokens) or 1024 (256 visual tokens), per its own
-            # "Support-Modes" doc. Anything else (640 was tried initially)
-            # hits an unguarded branch in deepencoderv2.py's
-            # Qwen2Decoder2Encoder.forward and crashes with an
-            # UnboundLocalError on `param_img`.
-            image_size=768,
-            crop_mode=False,
-            save_results=True,
-        )
+        # Inference only, never trained here -- without this, every call
+        # builds and retains a full autograd graph for nothing, which is a
+        # large, needless memory cost across a batch of many photos.
+        with torch.no_grad():
+            result = model.infer(
+                tokenizer,
+                prompt=OCR_PROMPT,
+                image_file=str(image_path),
+                output_path=str(output_dir),
+                base_size=1024,
+                # DeepSeek-OCR-2's encoder only supports two tile sizes -- 768
+                # (144 visual tokens) or 1024 (256 visual tokens), per its own
+                # "Support-Modes" doc. Anything else (640 was tried initially)
+                # hits an unguarded branch in deepencoderv2.py's
+                # Qwen2Decoder2Encoder.forward and crashes with an
+                # UnboundLocalError on `param_img`.
+                image_size=768,
+                crop_mode=False,
+                save_results=True,
+            )
 
         if isinstance(result, str) and result.strip():
             return _discard_if_refusal(result.strip())
@@ -142,6 +149,11 @@ def read_text(image: "Image") -> str:
         return ""
     finally:
         image_path.unlink(missing_ok=True)
+        # save_results=True writes text/markdown/visualization output here per
+        # call -- nothing downstream needs it once we've read the text above,
+        # and leaving it meant every photo in a batch left its output
+        # directory behind on disk permanently.
+        shutil.rmtree(output_dir, ignore_errors=True)
 
 
 def read_scene_text(image: "Image") -> str:

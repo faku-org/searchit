@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 import math
 import random
 import zlib
 from pathlib import Path
 
+import psutil
 from fastapi import FastAPI, HTTPException
 from PIL import Image, ImageStat
 from pydantic import BaseModel
@@ -12,6 +14,18 @@ from pydantic import BaseModel
 from config import get_execution_providers, get_settings
 
 app = FastAPI(title="SearchIt Inference")
+
+logger = logging.getLogger("uvicorn.error")
+_process = psutil.Process()
+
+
+def _log_rss(tag: str) -> None:
+    """Logs this process's resident memory after a real (non-mock) inference
+    call, tagged by endpoint, so a batch run's console output shows which
+    endpoint's memory keeps climbing rather than just an overall total --
+    temporary diagnostics for tracking down a real-world memory leak."""
+    rss_mb = _process.memory_info().rss / (1024 * 1024)
+    logger.info("[memory] %s: rss=%.1fMB", tag, rss_mb)
 
 FACE_EMBEDDING_DIMENSIONS = 512
 MOCK_IDENTITY_CLUSTERS = 5
@@ -131,6 +145,7 @@ def embed_image_endpoint(body: EmbedImageRequest) -> EmbedImageResponse:
 
     with Image.open(image_path) as img:
         embedding = embed_image(img.convert("RGB"))
+    _log_rss("embed-image")
     return EmbedImageResponse(embedding=embedding)
 
 
@@ -177,6 +192,7 @@ def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextRespons
 
     with Image.open(image_path) as img:
         text = read_scene_text(img.convert("RGB"))
+    _log_rss("read-scene-text")
     return ReadSceneTextResponse(text=text)
 
 
@@ -240,6 +256,7 @@ def _real_faces(image_path: Path) -> DetectFacesResponse:
         img = img.convert("RGB")
         results = detect_faces(img)
 
+    _log_rss("detect-faces")
     return DetectFacesResponse(
         faces=[
             FaceDetection(

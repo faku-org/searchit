@@ -30,6 +30,9 @@ dependencies = [
   "winsdk>=1.0.0b0; sys_platform == 'win32'",
   "pyobjc-framework-Vision; sys_platform == 'darwin'",
   "pyobjc-framework-Quartz; sys_platform == 'darwin'",
+  # Per-request RSS logging in app.py, to pin down which endpoint is
+  # actually responsible for real-world memory growth during a batch.
+  "psutil>=6.0",
 ]
 
 [project.optional-dependencies]
