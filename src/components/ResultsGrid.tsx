@@ -132,7 +132,12 @@ function PhotoCard({
               #{photo.customId}
             </span>
           )}
-          {photo.status !== "processed" && (
+          {photo.status === "failed" && (
+            <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
+              {statusLabel(t, photo.status)}
+            </span>
+          )}
+          {photo.status === "pending" && (
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
               {statusLabel(t, photo.status)}
             </span>

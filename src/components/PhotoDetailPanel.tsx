@@ -204,6 +204,41 @@ export function PhotoDetailPanel({
               )}
             </dl>
 
+            {detail.status === "failed" && detail.errorMessage && (
+              <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                <p className="font-medium">{t("photoDetail.failureReason")}</p>
+                <p className="mt-1 break-words">{detail.errorMessage}</p>
+              </div>
+            )}
+
+            <details className="rounded-md border border-neutral-200 text-sm dark:border-neutral-800">
+              <summary className="cursor-pointer select-none px-3 py-2 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
+                {t("photoDetail.devInfoToggle")}
+              </summary>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-neutral-200 p-3 dark:border-neutral-800">
+                <dt className="text-neutral-500">
+                  {t("photoDetail.dateSource")}
+                </dt>
+                <dd>
+                  {detail.takenAtSource === "exif"
+                    ? t("photoDetail.dateSourceExif")
+                    : detail.takenAtSource === "filesystem"
+                      ? t("photoDetail.dateSourceFilesystem")
+                      : t("common.unknown")}
+                </dd>
+
+                <dt className="text-neutral-500">
+                  {t("photoDetail.hasImageEmbedding")}
+                </dt>
+                <dd>{detail.hasImageEmbedding ? t("common.yes") : t("common.no")}</dd>
+
+                <dt className="text-neutral-500">
+                  {t("photoDetail.faceCount")}
+                </dt>
+                <dd>{detail.faces.length}</dd>
+              </dl>
+            </details>
+
             {detail.faces.length > 0 && (
               <div className="flex flex-col gap-2">
                 <span className="text-sm text-neutral-500">

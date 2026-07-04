@@ -5,7 +5,7 @@ import type {
   ReadSceneTextResponseBody,
 } from "@searchit/shared";
 
-const INFERENCE_URL = process.env.INFERENCE_URL ?? "http://localhost:8000";
+export const INFERENCE_URL = process.env.INFERENCE_URL ?? "http://localhost:8000";
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(`${INFERENCE_URL}${path}`, {

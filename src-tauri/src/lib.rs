@@ -1,9 +1,65 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+
+/// Whether the watch folder defaults to the OS Pictures folder on every
+/// launch, or remembers whatever folder was last picked via `set_watch_dir`.
+/// Persisted to `settings.json` (see `load_watch_settings`/`save_watch_settings`)
+/// so the choice survives app restarts, unlike the watch dir itself which the
+/// server has no runtime API to change (hence the sidecar restart dance).
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum WatchDirMode {
+    Pictures,
+    Last,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WatchSettings {
+    watch_dir_mode: WatchDirMode,
+    last_watch_dir: Option<String>,
+}
+
+impl Default for WatchSettings {
+    fn default() -> Self {
+        WatchSettings {
+            watch_dir_mode: WatchDirMode::Pictures,
+            last_watch_dir: None,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WatchSettingsResponse {
+    mode: WatchDirMode,
+    current_watch_dir: String,
+    pictures_dir: String,
+}
+
+fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("settings.json"))
+}
+
+fn load_watch_settings(app: &tauri::AppHandle) -> WatchSettings {
+    settings_path(app)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|contents| serde_json::from_str(&contents).ok())
+        .unwrap_or_default()
+}
+
+fn save_watch_settings(app: &tauri::AppHandle, settings: &WatchSettings) -> Result<(), String> {
+    let path = settings_path(app)?;
+    let contents = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    std::fs::write(path, contents).map_err(|e| e.to_string())
+}
 
 /// Fixed paths/settings the server sidecar is launched with, computed once in
 /// `setup()` and reused by `set_watch_dir` to restart just the server with a
@@ -19,6 +75,12 @@ struct ServerConfig {
 
 struct ServerProcess(Mutex<Option<CommandChild>>);
 struct InferenceProcess(Mutex<Option<CommandChild>>);
+
+/// The watch dir the server sidecar is actually running against right now --
+/// tracked separately from `WatchSettings` on disk because in "last" mode the
+/// remembered folder can vanish (deleted/unmounted) and silently fall back to
+/// Pictures, which `get_watch_settings` needs to report accurately.
+struct CurrentWatchDir(Mutex<Option<PathBuf>>);
 
 /// The bundled server's resolved URL, set once during `setup()` (it binds to
 /// a dynamically-chosen free port). Read by the `get_backend_url` command so
@@ -110,13 +172,14 @@ fn get_backend_url(state: tauri::State<BackendUrl>) -> Result<String, String> {
         .ok_or_else(|| "backend not ready yet".to_string())
 }
 
-/// Restarts the server sidecar pointed at a new watch folder (e.g. after the
-/// user picks one via a native folder dialog on the frontend). The server has
-/// no API to change its watch directory at runtime, so this kills and
-/// respawns it on the same port instead, which the frontend already knows.
-#[tauri::command]
-fn set_watch_dir(app: tauri::AppHandle, new_dir: String) -> Result<(), String> {
-    let watch_dir = PathBuf::from(new_dir);
+/// Kills and respawns the server sidecar against `watch_dir` (the server has
+/// no API to change its watch directory at runtime), on the same port the
+/// frontend already knows about, and records it as the current watch dir.
+/// Shared by `set_watch_dir` and `set_watch_dir_mode`.
+fn restart_server_with_watch_dir(
+    app: &tauri::AppHandle,
+    watch_dir: PathBuf,
+) -> Result<(), String> {
     std::fs::create_dir_all(&watch_dir).map_err(|e| e.to_string())?;
 
     if let Some(child) = app.state::<ServerProcess>().0.lock().unwrap().take() {
@@ -125,10 +188,78 @@ fn set_watch_dir(app: tauri::AppHandle, new_dir: String) -> Result<(), String> {
 
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     let config = app.state::<ServerConfig>();
-    let child = spawn_server(&app, &resource_dir, &config, &watch_dir).map_err(|e| e.to_string())?;
+    let child = spawn_server(app, &resource_dir, &config, &watch_dir).map_err(|e| e.to_string())?;
     app.state::<ServerProcess>().0.lock().unwrap().replace(child);
+    app.state::<CurrentWatchDir>()
+        .0
+        .lock()
+        .unwrap()
+        .replace(watch_dir);
 
     Ok(())
+}
+
+/// Restarts the server sidecar pointed at a new watch folder (e.g. after the
+/// user picks one via a native folder dialog on the frontend). Persists it as
+/// `lastWatchDir` and switches the mode to "last" so it's what's used again
+/// on the next launch, until the user explicitly switches back to Pictures.
+#[tauri::command]
+fn set_watch_dir(app: tauri::AppHandle, new_dir: String) -> Result<(), String> {
+    let watch_dir = PathBuf::from(&new_dir);
+
+    let mut settings = load_watch_settings(&app);
+    settings.watch_dir_mode = WatchDirMode::Last;
+    settings.last_watch_dir = Some(new_dir);
+    save_watch_settings(&app, &settings)?;
+
+    restart_server_with_watch_dir(&app, watch_dir)
+}
+
+/// Reports the current watch-dir mode, the folder actually in effect right
+/// now, and the OS Pictures folder path (so the Settings UI can offer
+/// "Reset to Pictures" without a round trip through the native folder picker).
+#[tauri::command]
+fn get_watch_settings(app: tauri::AppHandle) -> Result<WatchSettingsResponse, String> {
+    let settings = load_watch_settings(&app);
+    let pictures_dir = app.path().picture_dir().map_err(|e| e.to_string())?;
+    let current_watch_dir = app
+        .state::<CurrentWatchDir>()
+        .0
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "watch dir not ready yet".to_string())?;
+
+    Ok(WatchSettingsResponse {
+        mode: settings.watch_dir_mode,
+        current_watch_dir: current_watch_dir.to_string_lossy().to_string(),
+        pictures_dir: pictures_dir.to_string_lossy().to_string(),
+    })
+}
+
+/// Switches between "always use Pictures" and "remember last used folder"
+/// without going through the folder picker -- restarts the sidecar against
+/// the Pictures folder immediately when switching to that mode, or against
+/// whatever folder was last remembered (falling back to Pictures if it no
+/// longer exists) when switching to "last".
+#[tauri::command]
+fn set_watch_dir_mode(app: tauri::AppHandle, mode: WatchDirMode) -> Result<(), String> {
+    let mut settings = load_watch_settings(&app);
+    settings.watch_dir_mode = mode.clone();
+    save_watch_settings(&app, &settings)?;
+
+    let pictures_dir = app.path().picture_dir().map_err(|e| e.to_string())?;
+    let watch_dir = match mode {
+        WatchDirMode::Pictures => pictures_dir,
+        WatchDirMode::Last => settings
+            .last_watch_dir
+            .as_ref()
+            .map(PathBuf::from)
+            .filter(|path| path.exists())
+            .unwrap_or(pictures_dir),
+    };
+
+    restart_server_with_watch_dir(&app, watch_dir)
 }
 
 /// Opens the OS file manager with `path` selected, so the photographer can
@@ -176,13 +307,34 @@ pub fn run() {
         .manage(ServerProcess(Mutex::new(None)))
         .manage(InferenceProcess(Mutex::new(None)))
         .manage(BackendUrl(Mutex::new(None)))
+        .manage(CurrentWatchDir(Mutex::new(None)))
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             let db_dir = app_data_dir.join("db");
-            let watch_dir = app_data_dir.join("incoming");
             let preview_dir = app_data_dir.join("previews");
             let face_thumbnail_dir = app_data_dir.join("face-thumbnails");
             let model_cache_dir = app_data_dir.join("models");
+
+            // Defaults to the OS Pictures folder (falling back to
+            // app_data_dir/incoming if it can't be resolved, e.g. on an
+            // unusual OS config) since that's where a photographer's camera
+            // import tool normally drops files; "remember last used folder"
+            // (set via the Settings UI or the folder picker) is opt-in and
+            // persisted in settings.json, not the default.
+            let watch_settings = load_watch_settings(&app.handle());
+            let pictures_dir = app
+                .path()
+                .picture_dir()
+                .unwrap_or_else(|_| app_data_dir.join("incoming"));
+            let watch_dir = match watch_settings.watch_dir_mode {
+                WatchDirMode::Pictures => pictures_dir,
+                WatchDirMode::Last => watch_settings
+                    .last_watch_dir
+                    .as_ref()
+                    .map(PathBuf::from)
+                    .filter(|path| path.exists())
+                    .unwrap_or(pictures_dir),
+            };
 
             for dir in [
                 &db_dir,
@@ -219,6 +371,11 @@ pub fn run() {
                 .lock()
                 .unwrap()
                 .replace(server_child);
+            app.state::<CurrentWatchDir>()
+                .0
+                .lock()
+                .unwrap()
+                .replace(watch_dir);
             app.manage(server_config);
 
             // Not registered as a Tauri `externalBin` sidecar: PyInstaller's
@@ -277,7 +434,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             reveal_in_file_manager,
             get_backend_url,
-            set_watch_dir
+            set_watch_dir,
+            get_watch_settings,
+            set_watch_dir_mode
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

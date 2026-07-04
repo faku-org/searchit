@@ -11,6 +11,7 @@ import { identitiesRoutes } from "./routes/identities";
 import { locationsRoutes } from "./routes/locations";
 import { photosRoutes } from "./routes/photos";
 import { searchRoutes } from "./routes/search";
+import { statsRoutes } from "./routes/stats";
 
 const PORT = Number(process.env.PORT ?? 3001);
 // Defaults to loopback-only: the bundled desktop build runs its own server
@@ -56,6 +57,7 @@ const app = new Elysia()
   .use(identitiesRoutes)
   .use(facesRoutes)
   .use(locationsRoutes)
+  .use(statsRoutes)
   .listen({ port: PORT, hostname: HOST });
 
 console.log(`SearchIt server listening on http://${HOST}:${PORT}`);

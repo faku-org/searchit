@@ -57,6 +57,10 @@ export const photos = pgTable(
     previewPath: text("preview_path"),
     filename: text("filename").notNull(),
     takenAt: timestamp("taken_at", { withTimezone: true }),
+    // Where `takenAt` came from -- EXIF when the file had it, otherwise a
+    // filesystem birthtime/mtime fallback (see ingest/exif.ts). Surfaced in
+    // the developer view so a missing/wrong date is easy to explain.
+    takenAtSource: text("taken_at_source"),
     gpsLat: doublePrecision("gps_lat"),
     gpsLon: doublePrecision("gps_lon"),
     cameraModel: text("camera_model"),

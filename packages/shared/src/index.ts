@@ -12,6 +12,7 @@ export interface EventSummary {
   name: string;
   slug: string;
   startsAt: string | null;
+  photoCount: number;
 }
 
 export interface CreateEventRequestBody {
@@ -52,6 +53,8 @@ export interface FaceDetection {
   bbox: BoundingBox;
 }
 
+export type TakenAtSource = "exif" | "filesystem";
+
 export interface PhotoDetail extends PhotoSummary {
   originalPath: string;
   previewPath: string;
@@ -60,6 +63,17 @@ export interface PhotoDetail extends PhotoSummary {
   height: number | null;
   faces: FaceDetection[];
   recognizedText: string | null;
+  errorMessage: string | null;
+  takenAtSource: TakenAtSource | null;
+  hasImageEmbedding: boolean;
+}
+
+export interface FailedPhoto {
+  id: string;
+  eventId: string;
+  filename: string;
+  takenAt: string | null;
+  errorMessage: string | null;
 }
 
 export interface UpdatePhotoRequestBody {
@@ -84,6 +98,8 @@ export interface SearchFilters {
   locationId?: string;
   visualQuery?: string;
   sceneText?: string;
+  /** Smart combined search: matches bib/ID, OCR text, filename, and (if none of those match) visual similarity. */
+  q?: string;
 }
 
 export interface DetectFacesRequestBody {
@@ -139,9 +155,35 @@ export interface BackfillResponseBody {
   queued: number;
 }
 
+export interface ReprocessFailedResponseBody {
+  queued: number;
+}
+
 export interface ConfigResponseBody {
   /** Absolute path the server watches for new photos to ingest. */
   watchDir: string;
+}
+
+export interface StatsResponseBody {
+  total: number;
+  pending: number;
+  processed: number;
+  failed: number;
+  /** Currently running through the inference pipeline (bounded by ingest concurrency). */
+  active: number;
+  /** Waiting for a free worker slot. */
+  queued: number;
+}
+
+export interface DiagnosticsResponseBody {
+  watchDir: string;
+  previewDir: string;
+  faceThumbnailDir: string;
+  dbDir: string | null;
+  serverPort: number;
+  inferenceUrl: string;
+  inferenceHealthy: boolean;
+  ingestConcurrency: number;
 }
 
 export interface FaceMatchCandidate {

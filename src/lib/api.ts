@@ -4,15 +4,19 @@ import type {
   ConfigResponseBody,
   CreateEventRequestBody,
   CreateLocationRequestBody,
+  DiagnosticsResponseBody,
   EventSummary,
+  FailedPhoto,
   IdentitySummary,
   LocationSummary,
   MatchFaceResponseBody,
   PhotoDetail,
   PhotoSummary,
+  ReprocessFailedResponseBody,
   SearchFilters,
   SelectRegionAction,
   SelectRegionResponseBody,
+  StatsResponseBody,
 } from "@searchit/shared";
 import { getApiBaseUrl } from "./settings";
 
@@ -67,6 +71,7 @@ export function searchPhotos(filters: SearchFilters): Promise<PhotoSummary[]> {
   if (filters.locationId) params.set("locationId", filters.locationId);
   if (filters.visualQuery) params.set("visualQuery", filters.visualQuery);
   if (filters.sceneText) params.set("sceneText", filters.sceneText);
+  if (filters.q) params.set("q", filters.q);
 
   return apiFetch<PhotoSummary[]>(`/search?${params.toString()}`);
 }
@@ -151,4 +156,20 @@ export function selectRegion(
 
 export function backfillPhotos(): Promise<BackfillResponseBody> {
   return apiJsonRequest("POST", "/photos/backfill");
+}
+
+export function getStats(): Promise<StatsResponseBody> {
+  return apiFetch<StatsResponseBody>("/stats");
+}
+
+export function getDiagnostics(): Promise<DiagnosticsResponseBody> {
+  return apiFetch<DiagnosticsResponseBody>("/diagnostics");
+}
+
+export function getFailedPhotos(): Promise<FailedPhoto[]> {
+  return apiFetch<FailedPhoto[]>("/photos/failed");
+}
+
+export function reprocessFailed(): Promise<ReprocessFailedResponseBody> {
+  return apiJsonRequest("POST", "/photos/reprocess-failed");
 }

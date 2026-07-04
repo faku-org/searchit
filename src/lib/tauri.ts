@@ -23,8 +23,28 @@ export function pickWatchFolder(): Promise<string | null> {
 /**
  * The server has no API to change its watch directory at runtime, so this
  * restarts just the server sidecar pointed at `path` (same port, so the
- * frontend's already-resolved backend URL stays valid).
+ * frontend's already-resolved backend URL stays valid). Also persists `path`
+ * as the remembered folder and switches the mode to "last" on the Rust side.
  */
 export function setWatchDir(path: string): Promise<void> {
   return invoke("set_watch_dir", { newDir: path });
+}
+
+export type WatchDirMode = "pictures" | "last";
+
+export interface WatchSettings {
+  mode: WatchDirMode;
+  /** The folder actually in effect right now (may differ from a stale remembered folder that no longer exists). */
+  currentWatchDir: string;
+  /** The OS Pictures folder path, for a "Reset to Pictures" control. */
+  picturesDir: string;
+}
+
+export function getWatchSettings(): Promise<WatchSettings> {
+  return invoke("get_watch_settings");
+}
+
+/** Switches between "always use Pictures" and "remember last used folder", restarting the server sidecar accordingly. */
+export function setWatchDirMode(mode: WatchDirMode): Promise<void> {
+  return invoke("set_watch_dir_mode", { mode });
 }

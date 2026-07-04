@@ -1,8 +1,8 @@
-import { desc } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type { EventSummary } from "@searchit/shared";
 import { db } from "../db/client";
-import { events } from "../db/schema";
+import { events, photos } from "../db/schema";
 
 function slugify(name: string): string {
   return (
@@ -17,8 +17,17 @@ function slugify(name: string): string {
 export const eventsRoutes = new Elysia({ prefix: "/events" })
   .get("/", async (): Promise<EventSummary[]> => {
     const rows = await db
-      .select()
+      .select({
+        id: events.id,
+        name: events.name,
+        slug: events.slug,
+        startsAt: events.startsAt,
+        createdAt: events.createdAt,
+        photoCount: sql<number>`count(${photos.id})`.mapWith(Number),
+      })
       .from(events)
+      .leftJoin(photos, eq(photos.eventId, events.id))
+      .groupBy(events.id)
       .orderBy(desc(events.createdAt));
 
     return rows.map((row) => ({
@@ -26,6 +35,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       name: row.name,
       slug: row.slug,
       startsAt: row.startsAt ? row.startsAt.toISOString() : null,
+      photoCount: row.photoCount,
     }));
   })
   .post(
@@ -53,6 +63,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           name: created.name,
           slug: created.slug,
           startsAt: created.startsAt ? created.startsAt.toISOString() : null,
+          photoCount: 0,
         };
         return response;
       } catch {

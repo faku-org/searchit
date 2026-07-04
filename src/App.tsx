@@ -8,6 +8,8 @@ import type {
   SearchFilters,
 } from "@searchit/shared";
 import "./App.css";
+import { DevView } from "./components/DevView";
+import { HomeView } from "./components/HomeView";
 import { IdentifyByPhotoModal } from "./components/IdentifyByPhotoModal";
 import { MapView } from "./components/MapView";
 import { NewEventModal } from "./components/NewEventModal";
@@ -15,6 +17,7 @@ import { PeopleGrid } from "./components/PeopleGrid";
 import { PhotoDetailPanel } from "./components/PhotoDetailPanel";
 import { ResultsGrid } from "./components/ResultsGrid";
 import { SearchFiltersPanel } from "./components/SearchFiltersPanel";
+import { SettingsModal } from "./components/SettingsModal";
 import { TagLocationModal } from "./components/TagLocationModal";
 import {
   backfillPhotos,
@@ -30,11 +33,7 @@ import {
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
 import { getApiBaseUrl, setApiBaseUrl } from "./lib/settings";
-import {
-  getBackendUrl,
-  pickWatchFolder,
-  setWatchDir as setServerWatchDir,
-} from "./lib/tauri";
+import { getBackendUrl } from "./lib/tauri";
 import {
   checkForUpdate,
   installPendingUpdate,
@@ -53,11 +52,11 @@ interface PendingLocation {
   lon: number;
 }
 
-type Tab = "photos" | "people" | "map";
+type Tab = "home" | "photos" | "people" | "map" | "dev";
 
 function App() {
   const { t, locale, setLocale } = useTranslation();
-  const [tab, setTab] = useState<Tab>("photos");
+  const [tab, setTab] = useState<Tab>("home");
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(getApiBaseUrl());
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [locations, setLocations] = useState<LocationSummary[]>([]);
@@ -69,6 +68,7 @@ function App() {
 
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [showIdentifyModal, setShowIdentifyModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isTaggingLocation, setIsTaggingLocation] = useState(false);
   const [watchDir, setWatchDir] = useState<string | null>(null);
   const [pendingLocation, setPendingLocation] =
@@ -279,16 +279,22 @@ function App() {
     }
   }
 
-  async function handleChangeWatchDir() {
-    const picked = await pickWatchFolder();
-    if (!picked) return;
-    setError(null);
-    try {
-      await setServerWatchDir(picked);
-      setWatchDir(picked);
-    } catch {
-      setError(t("header.changeWatchDirError"));
-    }
+  function handleHomeSearch(query: string) {
+    setFilters((current) => ({ ...current, q: query }));
+    setSimilarityQuery(null);
+    setTab("photos");
+  }
+
+  function handleHomeAllPhotos() {
+    setFilters({});
+    setSimilarityQuery(null);
+    setTab("photos");
+  }
+
+  function handleHomeSelectEvent(eventId: string) {
+    setFilters({ eventId });
+    setSimilarityQuery(null);
+    setTab("photos");
   }
 
   return (
@@ -297,6 +303,9 @@ function App() {
         <div className="flex items-center gap-4">
           <h1 className="text-sm font-semibold">SearchIt</h1>
           <nav className="flex gap-1 text-sm">
+            <TabButton active={tab === "home"} onClick={() => setTab("home")}>
+              {t("nav.home")}
+            </TabButton>
             <TabButton
               active={tab === "photos"}
               onClick={() => setTab("photos")}
@@ -314,6 +323,9 @@ function App() {
             </TabButton>
             <TabButton active={tab === "map"} onClick={() => setTab("map")}>
               {t("nav.map")}
+            </TabButton>
+            <TabButton active={tab === "dev"} onClick={() => setTab("dev")}>
+              {t("nav.dev")}
             </TabButton>
           </nav>
         </div>
@@ -372,6 +384,13 @@ function App() {
           >
             {locale === "en" ? "ES" : "EN"}
           </button>
+          <button
+            type="button"
+            onClick={() => setShowSettingsModal(true)}
+            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          >
+            {t("header.settings")}
+          </button>
           <span>{t("header.server")}</span>
           <input
             type="text"
@@ -384,17 +403,8 @@ function App() {
       </header>
 
       {watchDir && (
-        <p className="flex items-center gap-2 truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
-          <span className="truncate">
-            {t("header.watchDir", { path: watchDir })}
-          </span>
-          <button
-            type="button"
-            onClick={() => void handleChangeWatchDir()}
-            className="shrink-0 rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            {t("header.changeWatchDir")}
-          </button>
+        <p className="truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
+          {t("header.watchDir", { path: watchDir })}
         </p>
       )}
 
@@ -416,6 +426,15 @@ function App() {
             {isInstallingUpdate ? t("update.installing") : t("update.install")}
           </button>
         </div>
+      )}
+
+      {tab === "home" && (
+        <HomeView
+          events={events}
+          onSearch={handleHomeSearch}
+          onAllPhotos={handleHomeAllPhotos}
+          onSelectEvent={handleHomeSelectEvent}
+        />
       )}
 
       {tab === "photos" &&
@@ -492,6 +511,17 @@ function App() {
           onSelectPhoto={(photo) => setSelectedPhotoId(photo.id)}
           isTagging={isTaggingLocation}
           onMapClick={handleMapClick}
+        />
+      )}
+
+      {tab === "dev" && (
+        <DevView onSelectPhoto={(photoId) => setSelectedPhotoId(photoId)} />
+      )}
+
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          onWatchDirChanged={setWatchDir}
         />
       )}
 

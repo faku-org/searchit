@@ -1,12 +1,11 @@
 import { watch } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-import { eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { events, photos } from "../db/schema";
 import { readExif } from "./exif";
-import { generatePreview } from "./preview";
-import { runInferencePipeline } from "./pipeline";
+import { enqueue } from "./queue";
+import { reprocessPhoto } from "./reprocess";
 
 const SUPPORTED_EXTENSIONS = new Set([
   ".jpg",
@@ -88,7 +87,12 @@ function queueFile(
   void waitForStableFile(fullPath)
     .then((stable) => {
       if (stable) {
-        return ingestFile(fullPath, watchDir, previewDir, faceThumbnailDir);
+        // Bounded by INGEST_CONCURRENCY (queue.ts) so a large batch drop
+        // doesn't flood the single inference sidecar with dozens of
+        // concurrent requests.
+        return enqueue(() =>
+          ingestFile(fullPath, watchDir, previewDir, faceThumbnailDir),
+        );
       }
     })
     .catch((error: unknown) => {
@@ -140,6 +144,7 @@ async function ingestFile(
       originalPath: fullPath,
       filename: path.basename(fullPath),
       takenAt: exif.takenAt,
+      takenAtSource: exif.takenAtSource,
       gpsLat: exif.gpsLat,
       gpsLon: exif.gpsLon,
       cameraModel: exif.cameraModel,
@@ -151,33 +156,9 @@ async function ingestFile(
 
   if (!photo) return;
 
-  try {
-    const preview = await generatePreview(fullPath, previewDir, photo.id);
-    await db
-      .update(photos)
-      .set({
-        previewPath: preview.previewPath,
-        width: exif.width ?? preview.width,
-        height: exif.height ?? preview.height,
-      })
-      .where(eq(photos.id, photo.id));
-
-    await runInferencePipeline(photo.id, preview.previewPath, faceThumbnailDir);
-
-    await db
-      .update(photos)
-      .set({ status: "processed" })
-      .where(eq(photos.id, photo.id));
-  } catch (error) {
-    await db
-      .update(photos)
-      .set({
-        status: "failed",
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
-      .where(eq(photos.id, photo.id));
-    throw error;
-  }
+  // Preview generation + inference share their pending/processed/failed
+  // bookkeeping with the manual "reprocess" and "retry all failed" paths.
+  await reprocessPhoto(photo.id, previewDir, faceThumbnailDir);
 }
 
 async function ensureEvent(slug: string) {
