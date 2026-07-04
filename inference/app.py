@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from PIL import Image, ImageStat
 from pydantic import BaseModel
 
-from config import get_settings
+from config import get_execution_providers, get_settings
 
 app = FastAPI(title="SearchIt Inference")
 
@@ -92,7 +92,17 @@ class ReadSceneTextResponse(BaseModel):
 @app.get("/health")
 def health():
     settings = get_settings()
-    return {"ok": True, "mock": settings.inference_mock, "device": settings.searchit_device}
+    # Real onnxruntime execution providers actually in use, not just the raw
+    # SEARCHIT_DEVICE env string -- lets callers (including the smoke test in
+    # scripts/smoke-test-sidecars.mjs) confirm e.g. CoreML was really selected
+    # on macOS rather than silently falling back to CPU.
+    providers = [] if settings.inference_mock else get_execution_providers()
+    return {
+        "ok": True,
+        "mock": settings.inference_mock,
+        "device": settings.searchit_device,
+        "providers": providers,
+    }
 
 
 @app.post("/detect-faces", response_model=DetectFacesResponse)

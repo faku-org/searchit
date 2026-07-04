@@ -7,7 +7,49 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Builds just the two backend sidecars (skips the full Rust/Tauri GUI
+  # compile and the Vite frontend build -- neither is needed to test them)
+  # and spawns them directly to exercise real endpoints, the same way
+  # src-tauri/src/lib.rs does. Runs on `workflow_dispatch` (for fast, cheap
+  # iteration) and on tag push, gating the actual release below.
+  smoke-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+          - platform: macos-14
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+
+      - name: Build server sidecar
+        run: bun scripts/bundle-server.mjs
+
+      - name: Stage Bun runtime sidecar
+        run: bun scripts/fetch-bun-sidecar.mjs
+
+      - name: Build inference sidecar
+        run: bun scripts/bundle-inference.mjs
+
+      - name: Smoke-test both sidecars
+        run: bun scripts/smoke-test-sidecars.mjs
+
   release:
+    needs: smoke-test
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     strategy:
