@@ -193,8 +193,11 @@ in `tauri.conf.json`, the check/install flow is `src/lib/updater.ts`, and
 release with a `latest.json` manifest on any `v*.*.*` tag push (the draft
 must be published manually before the updater endpoint will see it as
 "latest"). The release matrix covers Windows (signed) and macOS Apple Silicon
-(unsigned — no Apple Developer account/notarization yet; users open it once
-via right-click > Open to get past Gatekeeper).
+(unsigned — no Apple Developer account/notarization yet). Since it carries no
+signature at all, Gatekeeper on current macOS refuses it outright as
+"damaged" rather than offering the old right-click > Open override; users
+must manually clear the quarantine flag from Terminal instead:
+`xattr -cr /Applications/SearchIt.app`.
 
 ### Database
 
