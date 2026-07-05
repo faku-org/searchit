@@ -3,6 +3,8 @@ from __future__ import annotations
 import platform
 from typing import TYPE_CHECKING
 
+from gpu_lock import GPU_LOCK
+
 if TYPE_CHECKING:
     from PIL.Image import Image
 
@@ -111,12 +113,14 @@ def _read_with_rapidocr(image: "Image") -> str:
     global _rapidocr_engine
     import numpy as np
 
-    if _rapidocr_engine is None:
-        from rapidocr import RapidOCR
+    with GPU_LOCK:
+        if _rapidocr_engine is None:
+            from rapidocr import RapidOCR
 
-        _rapidocr_engine = RapidOCR()
+            _rapidocr_engine = RapidOCR()
 
-    result = _rapidocr_engine(np.array(image.convert("RGB")))
+        result = _rapidocr_engine(np.array(image.convert("RGB")))
+
     if result is None or not result.txts:
         return ""
     return "\n".join(result.txts)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import random
+import threading
 import zlib
 from pathlib import Path
 
@@ -13,9 +14,10 @@ from pydantic import BaseModel
 
 from config import get_execution_providers, get_settings
 
+logger = logging.getLogger("searchit.inference")
+
 app = FastAPI(title="SearchIt Inference")
 
-logger = logging.getLogger("uvicorn.error")
 _process = psutil.Process()
 
 
@@ -26,6 +28,35 @@ def _log_rss(tag: str) -> None:
     temporary diagnostics for tracking down a real-world memory leak."""
     rss_mb = _process.memory_info().rss / (1024 * 1024)
     logger.info("[memory] %s: rss=%.1fMB", tag, rss_mb)
+
+
+def _warmup_models() -> None:
+    """Loads the real onnxruntime models (faces, then CLIP) once at startup,
+    off the request-handling threadpool, so the first retry-all batch doesn't
+    pay the multi-second load while holding GPU_LOCK and stalling every other
+    request behind it. Best-effort: on failure, the affected model just falls
+    back to its usual lazy load on first use."""
+    try:
+        from faces import warmup as warmup_faces
+
+        warmup_faces()
+    except Exception:
+        logger.exception("Face model warmup failed; will lazy-load on first request")
+
+    try:
+        from clip_embed import warmup as warmup_clip
+
+        warmup_clip()
+    except Exception:
+        logger.exception("CLIP model warmup failed; will lazy-load on first request")
+
+
+@app.on_event("startup")
+def _on_startup() -> None:
+    settings = get_settings()
+    if settings.inference_mock:
+        return
+    threading.Thread(target=_warmup_models, daemon=True).start()
 
 FACE_EMBEDDING_DIMENSIONS = 512
 MOCK_IDENTITY_CLUSTERS = 5

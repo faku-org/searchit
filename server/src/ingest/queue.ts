@@ -1,3 +1,5 @@
+import { computeDefaultWorkerCount } from "./hardwareWorkers";
+
 // Bounded worker-pool queue shared by fresh ingest (watcher.ts), manual
 // reprocess, and backfill/reprocess-failed -- all of them ultimately call
 // `runInferencePipeline`, which talks to the single inference sidecar, so
@@ -6,7 +8,19 @@
 // so the concurrency limit and the live stats used by the progress bar/dev
 // view are always accurate no matter which caller queued the work.
 
-const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY ?? "3");
+const CONCURRENCY = (() => {
+  if (process.env.INGEST_CONCURRENCY) {
+    return Number(process.env.INGEST_CONCURRENCY);
+  }
+
+  const { workers, cores, ramGB, vramGB } = computeDefaultWorkerCount();
+  console.log(
+    `Auto-detected ${workers} ingest workers (cores=${cores}, ramGB=${ramGB.toFixed(1)}, ` +
+      `vramGB=${vramGB === null ? "n/a" : vramGB.toFixed(1)}). ` +
+      "Set INGEST_CONCURRENCY to override.",
+  );
+  return workers;
+})();
 
 interface QueueEntry {
   run: () => Promise<void>;
