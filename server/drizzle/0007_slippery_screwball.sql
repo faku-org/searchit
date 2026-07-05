@@ -1,1 +1,1 @@
-ALTER TABLE "events" ADD COLUMN "sports_mode" boolean DEFAULT false NOT NULL;
+ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "sports_mode" boolean DEFAULT false NOT NULL;
