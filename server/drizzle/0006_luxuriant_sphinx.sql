@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "sports_mode" boolean DEFAULT false NOT NULL;

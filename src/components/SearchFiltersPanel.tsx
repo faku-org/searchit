@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Search,
   TextSearch,
+  Trophy,
 } from "lucide-react";
 import type { EventSummary, LocationSummary, SearchFilters } from "@searchit/shared";
 import { useTranslation } from "../lib/i18n";
@@ -24,6 +25,7 @@ interface SearchFiltersPanelProps {
   filters: SearchFilters;
   onChange: (filters: SearchFilters) => void;
   onSubmit: () => void;
+  onToggleEventSportsMode: (eventId: string, sportsMode: boolean) => void;
   isLoading: boolean;
 }
 
@@ -33,9 +35,11 @@ export function SearchFiltersPanel({
   filters,
   onChange,
   onSubmit,
+  onToggleEventSportsMode,
   isLoading,
 }: SearchFiltersPanelProps) {
   const { t } = useTranslation();
+  const selectedEvent = events.find((event) => event.id === filters.eventId);
 
   function update<K extends keyof SearchFilters>(
     key: K,
@@ -70,6 +74,25 @@ export function SearchFiltersPanel({
           ))}
         </select>
       </SelectField>
+
+      {selectedEvent && (
+        <label
+          className={`${fieldShellClass} cursor-pointer self-end`}
+          title={t("filters.sportsModeTitle")}
+        >
+          <Trophy className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+          <input
+            type="checkbox"
+            checked={selectedEvent.sportsMode}
+            onChange={(event) =>
+              onToggleEventSportsMode(selectedEvent.id, event.target.checked)
+            }
+          />
+          <span className="text-sm text-mist-100">
+            {t("filters.sportsMode")}
+          </span>
+        </label>
+      )}
 
       <Field icon={CalendarDays} label={t("filters.from")}>
         <input

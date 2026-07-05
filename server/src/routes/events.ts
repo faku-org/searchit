@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type { CreateEventResponseBody, EventSummary } from "@searchit/shared";
 import { db } from "../db/client";
@@ -33,6 +33,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       name: row.name,
       slug: row.slug,
       startsAt: row.startsAt ? row.startsAt.toISOString() : null,
+      sportsMode: row.sportsMode,
     }));
   })
   .post(
@@ -47,6 +48,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             name: body.name,
             slug,
             startsAt: body.startsAt ? new Date(body.startsAt) : null,
+            sportsMode: body.sportsMode ?? false,
           })
           .returning();
 
@@ -67,6 +69,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           name: created.name,
           slug: created.slug,
           startsAt: created.startsAt ? created.startsAt.toISOString() : null,
+          sportsMode: created.sportsMode,
           folderPath,
         };
       } catch {
@@ -79,6 +82,36 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         name: t.String({ minLength: 1 }),
         slug: t.Optional(t.String()),
         startsAt: t.Optional(t.String()),
+        sportsMode: t.Optional(t.Boolean()),
+      }),
+    },
+  )
+  .patch(
+    "/:id",
+    async ({ params, body, set }) => {
+      const [updated] = await db
+        .update(events)
+        .set({ sportsMode: body.sportsMode })
+        .where(eq(events.id, params.id))
+        .returning();
+
+      if (!updated) {
+        set.status = 404;
+        return { error: "Event not found" };
+      }
+
+      const response: EventSummary = {
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        startsAt: updated.startsAt ? updated.startsAt.toISOString() : null,
+        sportsMode: updated.sportsMode,
+      };
+      return response;
+    },
+    {
+      body: t.Object({
+        sportsMode: t.Boolean(),
       }),
     },
   );
