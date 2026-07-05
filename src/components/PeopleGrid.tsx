@@ -7,21 +7,33 @@ interface PeopleGridProps {
   identities: IdentitySummary[];
   onSelect: (identity: IdentitySummary) => void;
   onRename: (id: string, displayName: string | null) => void;
+  tourId?: string;
 }
 
-export function PeopleGrid({ identities, onSelect, onRename }: PeopleGridProps) {
+export function PeopleGrid({
+  identities,
+  onSelect,
+  onRename,
+  tourId,
+}: PeopleGridProps) {
   const { t } = useTranslation();
 
   if (identities.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
+      <div
+        data-tour={tourId}
+        className="flex flex-1 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400"
+      >
         {t("people.empty")}
       </div>
     );
   }
 
   return (
-    <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 overflow-y-auto p-4 content-start">
+    <div
+      data-tour={tourId}
+      className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 overflow-y-auto p-4 content-start"
+    >
       {identities.map((identity) => (
         <IdentityCard
           key={identity.id}

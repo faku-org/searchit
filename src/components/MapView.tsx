@@ -11,6 +11,7 @@ interface MapViewProps {
   onSelectPhoto: (photo: PhotoSummary) => void;
   isTagging: boolean;
   onMapClick: (lat: number, lon: number) => void;
+  tourId?: string;
 }
 
 const DEFAULT_CENTER: [number, number] = [0, 0];
@@ -41,6 +42,7 @@ export function MapView({
   onSelectPhoto,
   isTagging,
   onMapClick,
+  tourId,
 }: MapViewProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -116,7 +118,7 @@ export function MapView({
   }, [photos, locations]);
 
   return (
-    <div className="relative flex-1">
+    <div data-tour={tourId} className="relative flex-1">
       <div ref={containerRef} className="h-full w-full" />
       {isTagging && (
         <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">

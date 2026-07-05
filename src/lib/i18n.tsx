@@ -109,6 +109,45 @@ const en = {
   "update.available": "Version {version} is available.",
   "update.install": "Install and restart",
   "update.installing": "Installing…",
+  "onboarding.replayButton": "Show tutorial",
+  "onboarding.next": "Next",
+  "onboarding.back": "Back",
+  "onboarding.skip": "Skip tour",
+  "onboarding.finish": "Finish",
+  "onboarding.progress": "{current} / {total}",
+  "onboarding.welcome.title": "Welcome to SearchIt",
+  "onboarding.welcome.body":
+    "SearchIt auto-tags every photo you shoot -- faces, GPS, on-photo text, and visual similarity -- so you and your clients can find exactly the right shot. This quick tour covers the basics.",
+  "onboarding.navTabs.title": "Three views",
+  "onboarding.navTabs.body":
+    "Photos lets you search your whole archive. People groups shots by who's in them. Map shows where every photo was taken.",
+  "onboarding.searchFilters.title": "Search your archive",
+  "onboarding.searchFilters.body":
+    "Filter by bib number, event, date range, location and radius, a text description of the shot, or text visible in the photo (like a finish-line banner).",
+  "onboarding.resultsGrid.title": "Browse results",
+  "onboarding.resultsGrid.body":
+    "Click any photo to open its details. Inside, you can drag a box around a region to find similar photos or to link a face SearchIt missed.",
+  "onboarding.peopleGrid.title": "Everyone, automatically",
+  "onboarding.peopleGrid.body":
+    "SearchIt recognizes faces across your entire archive, not just one event, and groups every photo of the same person here.",
+  "onboarding.identifyByPhoto.title": "Find a specific client",
+  "onboarding.identifyByPhoto.body":
+    "Upload a clear photo of someone's face and SearchIt will find their matching photos across every event, instantly.",
+  "onboarding.mapView.title": "See it on the map",
+  "onboarding.mapView.body":
+    "Every photo with GPS data shows up here as a marker. Click one to jump straight to that photo.",
+  "onboarding.tagLocation.title": "Tag real-world spots",
+  "onboarding.tagLocation.body":
+    "Mark a start line, finish line, or aid station on the map so photos near it can be found by location.",
+  "onboarding.newEvent.title": "Create an event per race",
+  "onboarding.newEvent.body":
+    "Events keep each race's photos grouped and searchable separately. New photos land under an event based on the folder they're dropped into.",
+  "onboarding.watchDir.title": "Just drop in your photos",
+  "onboarding.watchDir.body":
+    "Copy new photos into this folder and SearchIt processes them automatically. Already have older photos? Use the Backfill button to reprocess them too.",
+  "onboarding.langToggle.title": "Switch language anytime",
+  "onboarding.langToggle.body":
+    "SearchIt works in English and Spanish. You can replay this tour whenever you like from the \"?\" button up here.",
 } as const;
 
 export type TranslationKey = keyof typeof en;
@@ -210,6 +249,45 @@ const es: Record<TranslationKey, string> = {
   "update.available": "La versión {version} está disponible.",
   "update.install": "Instalar y reiniciar",
   "update.installing": "Instalando…",
+  "onboarding.replayButton": "Mostrar tutorial",
+  "onboarding.next": "Siguiente",
+  "onboarding.back": "Atrás",
+  "onboarding.skip": "Saltar tutorial",
+  "onboarding.finish": "Finalizar",
+  "onboarding.progress": "{current} / {total}",
+  "onboarding.welcome.title": "Bienvenido a SearchIt",
+  "onboarding.welcome.body":
+    "SearchIt etiqueta automáticamente cada foto que sacás -- caras, GPS, texto en la imagen y similitud visual -- para que vos y tus clientes encuentren justo la foto que buscan. Este recorrido rápido cubre lo básico.",
+  "onboarding.navTabs.title": "Tres vistas",
+  "onboarding.navTabs.body":
+    "Fotos te deja buscar en todo tu archivo. Personas agrupa las fotos según quién aparece en ellas. Mapa muestra dónde se tomó cada foto.",
+  "onboarding.searchFilters.title": "Buscá en tu archivo",
+  "onboarding.searchFilters.body":
+    "Filtrá por número de dorsal, evento, rango de fechas, ubicación y radio, una descripción de la escena, o texto visible en la foto (como un cartel de la línea de llegada).",
+  "onboarding.resultsGrid.title": "Explorá los resultados",
+  "onboarding.resultsGrid.body":
+    "Hacé clic en cualquier foto para ver sus detalles. Ahí podés arrastrar un recuadro para buscar fotos similares o vincular una cara que SearchIt no detectó.",
+  "onboarding.peopleGrid.title": "Todos, automáticamente",
+  "onboarding.peopleGrid.body":
+    "SearchIt reconoce caras en todo tu archivo, no solo en un evento, y agrupa acá todas las fotos de la misma persona.",
+  "onboarding.identifyByPhoto.title": "Encontrá a un cliente puntual",
+  "onboarding.identifyByPhoto.body":
+    "Subí una foto clara de la cara de alguien y SearchIt va a encontrar sus fotos en todos los eventos, al instante.",
+  "onboarding.mapView.title": "Vela en el mapa",
+  "onboarding.mapView.body":
+    "Cada foto con datos GPS aparece acá como un marcador. Hacé clic en uno para ir directo a esa foto.",
+  "onboarding.tagLocation.title": "Marcá lugares reales",
+  "onboarding.tagLocation.body":
+    "Marcá una largada, una llegada o un puesto de hidratación en el mapa para poder encontrar fotos cercanas por ubicación.",
+  "onboarding.newEvent.title": "Creá un evento por carrera",
+  "onboarding.newEvent.body":
+    "Los eventos mantienen las fotos de cada carrera agrupadas y buscables por separado. Las fotos nuevas se asignan a un evento según la carpeta donde las soltás.",
+  "onboarding.watchDir.title": "Simplemente soltá tus fotos",
+  "onboarding.watchDir.body":
+    "Copiá las fotos nuevas en esta carpeta y SearchIt las procesa automáticamente. ¿Ya tenés fotos viejas? Usá el botón Reprocesar para procesarlas también.",
+  "onboarding.langToggle.title": "Cambiá de idioma cuando quieras",
+  "onboarding.langToggle.body":
+    "SearchIt funciona en inglés y en español. Podés volver a ver este tutorial cuando quieras desde el botón \"?\" de acá arriba.",
 };
 
 const dictionaries: Record<Locale, Record<TranslationKey, string>> = {

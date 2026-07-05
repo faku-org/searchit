@@ -6,6 +6,7 @@ import { statusLabel, useTranslation } from "../lib/i18n";
 interface ResultsGridProps {
   photos: PhotoSummary[];
   onSelect: (photo: PhotoSummary) => void;
+  tourId?: string;
 }
 
 interface PhotoGroup {
@@ -54,7 +55,7 @@ function groupByLocalDate(
   });
 }
 
-export function ResultsGrid({ photos, onSelect }: ResultsGridProps) {
+export function ResultsGrid({ photos, onSelect, tourId }: ResultsGridProps) {
   const { t, locale } = useTranslation();
 
   const dateFormatter = useMemo(
@@ -75,14 +76,17 @@ export function ResultsGrid({ photos, onSelect }: ResultsGridProps) {
 
   if (photos.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
+      <div
+        data-tour={tourId}
+        className="flex flex-1 items-center justify-center text-sm text-neutral-500 dark:text-neutral-400"
+      >
         {t("results.empty")}
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
+    <div data-tour={tourId} className="flex-1 overflow-y-auto p-4">
       {groups.map((group) => (
         <section key={group.key} className="mb-6 last:mb-0">
           <h3 className="sticky top-0 z-10 -mx-4 mb-2 bg-neutral-50/95 px-4 py-1.5 text-xs font-semibold text-neutral-500 backdrop-blur-sm dark:bg-neutral-950/95 dark:text-neutral-400">

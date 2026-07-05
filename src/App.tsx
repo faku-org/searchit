@@ -11,6 +11,7 @@ import "./App.css";
 import { IdentifyByPhotoModal } from "./components/IdentifyByPhotoModal";
 import { MapView } from "./components/MapView";
 import { NewEventModal } from "./components/NewEventModal";
+import { OnboardingTour } from "./components/OnboardingTour";
 import { PeopleGrid } from "./components/PeopleGrid";
 import { PhotoDetailPanel } from "./components/PhotoDetailPanel";
 import { ResultsGrid } from "./components/ResultsGrid";
@@ -29,6 +30,7 @@ import {
   searchPhotos,
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
+import { hasSeenOnboardingTour } from "./lib/onboarding";
 import { getApiBaseUrl, setApiBaseUrl } from "./lib/settings";
 import {
   getBackendUrl,
@@ -53,7 +55,7 @@ interface PendingLocation {
   lon: number;
 }
 
-type Tab = "photos" | "people" | "map";
+export type Tab = "photos" | "people" | "map";
 
 function App() {
   const { t, locale, setLocale } = useTranslation();
@@ -89,6 +91,12 @@ function App() {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const [isBackendUrlResolved, setIsBackendUrlResolved] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+
+  function handleTabChange(next: Tab) {
+    setTab(next);
+    if (next === "people") setSelectedIdentity(null);
+  }
 
   function refreshEvents(options?: { silent?: boolean }) {
     getEvents()
@@ -139,6 +147,7 @@ function App() {
     getConfig()
       .then((config) => setWatchDir(config.watchDir))
       .catch(() => setWatchDir(null));
+    if (!hasSeenOnboardingTour()) setShowTour(true);
   }, [isBackendUrlResolved]);
 
   // The server ingests new photos in the background (folder watcher +
@@ -296,23 +305,23 @@ function App() {
       <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
         <div className="flex items-center gap-4">
           <h1 className="text-sm font-semibold">SearchIt</h1>
-          <nav className="flex gap-1 text-sm">
+          <nav data-tour="nav-tabs" className="flex gap-1 text-sm">
             <TabButton
               active={tab === "photos"}
-              onClick={() => setTab("photos")}
+              onClick={() => handleTabChange("photos")}
             >
               {t("nav.photos")}
             </TabButton>
             <TabButton
               active={tab === "people"}
-              onClick={() => {
-                setTab("people");
-                setSelectedIdentity(null);
-              }}
+              onClick={() => handleTabChange("people")}
             >
               {t("nav.people")}
             </TabButton>
-            <TabButton active={tab === "map"} onClick={() => setTab("map")}>
+            <TabButton
+              active={tab === "map"}
+              onClick={() => handleTabChange("map")}
+            >
               {t("nav.map")}
             </TabButton>
           </nav>
@@ -321,6 +330,7 @@ function App() {
           {tab === "map" && (
             <button
               type="button"
+              data-tour="tag-location-btn"
               onClick={() => setIsTaggingLocation((current) => !current)}
               className={`rounded border px-2 py-1 ${
                 isTaggingLocation
@@ -336,6 +346,7 @@ function App() {
           {tab === "people" && (
             <button
               type="button"
+              data-tour="identify-by-photo"
               onClick={() => setShowIdentifyModal(true)}
               className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             >
@@ -344,6 +355,7 @@ function App() {
           )}
           <button
             type="button"
+            data-tour="new-event-btn"
             onClick={() => setShowNewEventModal(true)}
             className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           >
@@ -351,6 +363,7 @@ function App() {
           </button>
           <button
             type="button"
+            data-tour="backfill-btn"
             onClick={() => void handleBackfill()}
             className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           >
@@ -366,6 +379,15 @@ function App() {
           </button>
           <button
             type="button"
+            onClick={() => setShowTour(true)}
+            title={t("onboarding.replayButton")}
+            className="rounded border border-neutral-300 px-2 py-1 font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          >
+            ?
+          </button>
+          <button
+            type="button"
+            data-tour="lang-toggle"
             onClick={() => setLocale(locale === "en" ? "es" : "en")}
             title="Language / Idioma"
             className="rounded border border-neutral-300 px-2 py-1 font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
@@ -384,7 +406,10 @@ function App() {
       </header>
 
       {watchDir && (
-        <p className="flex items-center gap-2 truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
+        <p
+          data-tour="watch-dir-row"
+          className="flex items-center gap-2 truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600"
+        >
           <span className="truncate">
             {t("header.watchDir", { path: watchDir })}
           </span>
@@ -447,10 +472,12 @@ function App() {
               onChange={setFilters}
               onSubmit={() => void runSearch()}
               isLoading={isLoading}
+              tourId="search-filters"
             />
             <ResultsGrid
               photos={photos}
               onSelect={(photo) => setSelectedPhotoId(photo.id)}
+              tourId="results-grid"
             />
           </>
         ))}
@@ -482,6 +509,7 @@ function App() {
             onRename={(id, displayName) =>
               void handleRenameIdentity(id, displayName)
             }
+            tourId="people-grid"
           />
         ))}
 
@@ -492,6 +520,7 @@ function App() {
           onSelectPhoto={(photo) => setSelectedPhotoId(photo.id)}
           isTagging={isTaggingLocation}
           onMapClick={handleMapClick}
+          tourId="map-view"
         />
       )}
 
@@ -529,6 +558,14 @@ function App() {
           photoId={selectedPhotoId}
           onClose={() => setSelectedPhotoId(null)}
           onFindSimilar={handleFindSimilar}
+        />
+      )}
+
+      {showTour && (
+        <OnboardingTour
+          activeTab={tab}
+          onChangeTab={handleTabChange}
+          onClose={() => setShowTour(false)}
         />
       )}
     </main>

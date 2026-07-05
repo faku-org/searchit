@@ -12,6 +12,7 @@ interface SearchFiltersPanelProps {
   onChange: (filters: SearchFilters) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  tourId?: string;
 }
 
 export function SearchFiltersPanel({
@@ -21,6 +22,7 @@ export function SearchFiltersPanel({
   onChange,
   onSubmit,
   isLoading,
+  tourId,
 }: SearchFiltersPanelProps) {
   const { t } = useTranslation();
 
@@ -33,6 +35,7 @@ export function SearchFiltersPanel({
 
   return (
     <form
+      data-tour={tourId}
       className="flex flex-wrap items-end gap-3 border-b border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
       onSubmit={(event) => {
         event.preventDefault();
