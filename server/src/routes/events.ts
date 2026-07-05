@@ -30,6 +30,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         slug: events.slug,
         startsAt: events.startsAt,
         createdAt: events.createdAt,
+        sportsMode: events.sportsMode,
         photoCount: sql<number>`count(${photos.id})`.mapWith(Number),
       })
       .from(events)
@@ -43,6 +44,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       slug: row.slug,
       startsAt: row.startsAt ? row.startsAt.toISOString() : null,
       photoCount: row.photoCount,
+      sportsMode: row.sportsMode,
     }));
   })
   .post(
@@ -57,6 +59,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             name: body.name,
             slug,
             startsAt: body.startsAt ? new Date(body.startsAt) : null,
+            sportsMode: body.sportsMode ?? false,
           })
           .returning();
 
@@ -78,6 +81,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           slug: created.slug,
           startsAt: created.startsAt ? created.startsAt.toISOString() : null,
           photoCount: 0,
+          sportsMode: created.sportsMode,
           folderPath,
         };
       } catch {
@@ -90,6 +94,42 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         name: t.String({ minLength: 1 }),
         slug: t.Optional(t.String()),
         startsAt: t.Optional(t.String()),
+        sportsMode: t.Optional(t.Boolean()),
+      }),
+    },
+  )
+  .patch(
+    "/:id",
+    async ({ params, body, set }) => {
+      const [updated] = await db
+        .update(events)
+        .set({ sportsMode: body.sportsMode })
+        .where(eq(events.id, params.id))
+        .returning();
+
+      if (!updated) {
+        set.status = 404;
+        return { error: "Event not found" };
+      }
+
+      const [photoCountRow] = await db
+        .select({ value: sql<number>`count(*)`.mapWith(Number) })
+        .from(photos)
+        .where(eq(photos.eventId, updated.id));
+
+      const response: EventSummary = {
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        startsAt: updated.startsAt ? updated.startsAt.toISOString() : null,
+        photoCount: photoCountRow?.value ?? 0,
+        sportsMode: updated.sportsMode,
+      };
+      return response;
+    },
+    {
+      body: t.Object({
+        sportsMode: t.Boolean(),
       }),
     },
   );

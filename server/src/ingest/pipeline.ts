@@ -84,7 +84,15 @@ export async function runInferencePipeline(
   }
 
   try {
-    const { text } = await readSceneText(previewPath);
+    const photoEvent = await db.query.photos.findFirst({
+      where: (row, { eq }) => eq(row.id, photoId),
+      columns: {},
+      with: { event: { columns: { sportsMode: true } } },
+    });
+    const { text } = await readSceneText(
+      previewPath,
+      photoEvent?.event?.sportsMode ?? false,
+    );
     await db
       .update(photos)
       .set({ recognizedText: text || null })

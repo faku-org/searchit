@@ -23,6 +23,7 @@ export function NewEventModal({ onClose, onCreate }: NewEventModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [startsAt, setStartsAt] = useState("");
+  const [sportsMode, setSportsMode] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +32,11 @@ export function NewEventModal({ onClose, onCreate }: NewEventModalProps) {
     setIsBusy(true);
     setError(null);
     try {
-      await onCreate({ name: name.trim(), startsAt: startsAt || undefined });
+      await onCreate({
+        name: name.trim(),
+        startsAt: startsAt || undefined,
+        sportsMode,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -97,6 +102,15 @@ export function NewEventModal({ onClose, onCreate }: NewEventModalProps) {
             onChange={(event) => setStartsAt(event.target.value)}
             className={inputClass}
           />
+        </label>
+
+        <label className="flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          <input
+            type="checkbox"
+            checked={sportsMode}
+            onChange={(event) => setSportsMode(event.target.checked)}
+          />
+          {t("newEvent.sportsMode")}
         </label>
 
         <div className="flex justify-end gap-2 pt-1">

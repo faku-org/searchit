@@ -13,12 +13,18 @@ export interface EventSummary {
   slug: string;
   startsAt: string | null;
   photoCount: number;
+  sportsMode: boolean;
 }
 
 export interface CreateEventRequestBody {
   name: string;
   slug?: string;
   startsAt?: string;
+  sportsMode?: boolean;
+}
+
+export interface UpdateEventRequestBody {
+  sportsMode: boolean;
 }
 
 export interface CreateEventResponseBody extends EventSummary {
@@ -131,6 +137,8 @@ export interface EmbedTextResponseBody {
 
 export interface ReadSceneTextRequestBody {
   imagePath: string;
+  /** Forces the higher-accuracy OCR tier (RapidOCR, or DeepSeek-OCR-2 on a CUDA box) for bib-number-heavy race photos. */
+  sportsMode?: boolean;
 }
 
 export interface ReadSceneTextResponseBody {

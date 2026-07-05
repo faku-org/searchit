@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   doublePrecision,
   index,
   integer,
@@ -41,6 +42,11 @@ export const events = pgTable("events", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   startsAt: timestamp("starts_at", { withTimezone: true }),
+  // Bib numbers on race photos are small/angled text that the OS-native OCR
+  // tier (ocr_native.py's Windows.Media.Ocr/Apple Vision) tends to miss --
+  // this forces the bundled RapidOCR ONNX model instead, on every platform,
+  // for this event's photos.
+  sportsMode: boolean("sports_mode").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

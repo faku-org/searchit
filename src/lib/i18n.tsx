@@ -53,6 +53,7 @@ const en = {
   "importPhotos.body":
     'Event "{eventName}" created. Drop photos into this folder and they\'ll be indexed automatically:',
   "importPhotos.openFolder": "Open folder",
+  "newEvent.sportsMode": "Sports event (higher-accuracy bib number OCR)",
   "common.cancel": "Cancel",
   "common.creating": "Creating…",
   "common.create": "Create",
@@ -127,6 +128,9 @@ const en = {
   "filters.photoId": "Photo ID",
   "filters.event": "Event",
   "filters.allEvents": "All events",
+  "filters.sportsMode": "Sports event OCR",
+  "filters.sportsModeTitle":
+    "Force higher-accuracy OCR (RapidOCR, or DeepSeek-OCR-2 on a CUDA box) for bib numbers on this event's photos",
   "filters.from": "From",
   "filters.to": "To",
   "filters.location": "Location",
@@ -252,6 +256,7 @@ const es: Record<TranslationKey, string> = {
   "importPhotos.body":
     'Se creó el evento "{eventName}". Colocá las fotos en esta carpeta y se indexarán automáticamente:',
   "importPhotos.openFolder": "Abrir carpeta",
+  "newEvent.sportsMode": "Evento deportivo (OCR de dorsal de mayor precisión)",
   "common.cancel": "Cancelar",
   "common.creating": "Creando…",
   "common.create": "Crear",
@@ -326,6 +331,9 @@ const es: Record<TranslationKey, string> = {
   "filters.photoId": "ID de foto",
   "filters.event": "Evento",
   "filters.allEvents": "Todos los eventos",
+  "filters.sportsMode": "OCR de evento deportivo",
+  "filters.sportsModeTitle":
+    "Forzar OCR de mayor precisión (RapidOCR, o DeepSeek-OCR-2 en una máquina con CUDA) para los dorsales de las fotos de este evento",
   "filters.from": "Desde",
   "filters.to": "Hasta",
   "filters.location": "Ubicación",

@@ -13,14 +13,23 @@ _windows_ocr_engine = None
 _windows_ocr_engine_loaded = False
 
 
-def read_scene_text(image: "Image") -> str:
+def read_scene_text(image: "Image", force_rapidocr: bool = False) -> str:
     """Cross-platform OCR with no GPU and no multi-gigabyte model download:
     OS-native text recognition where the OS ships one for free (Apple Vision
     on macOS, Windows.Media.Ocr on Windows), else a small bundled ONNX OCR
     model (RapidOCR) that runs anywhere onnxruntime does. See ocr.py for the
     separate, higher-quality DeepSeek-OCR-2 tier used instead of this on an
     NVIDIA CUDA box with the `ml` extra installed.
+
+    `force_rapidocr` skips the OS-native engines even where they're available:
+    Windows.Media.Ocr/Apple Vision are general-purpose and tend to miss small,
+    angled text like race-bib numbers, whereas RapidOCR's detector is tuned
+    for exactly that kind of dense/small text. Used for events flagged as
+    `sportsMode` (see server/src/ingest/pipeline.ts).
     """
+    if force_rapidocr:
+        return _read_with_rapidocr(image)
+
     system = platform.system()
     if system == "Darwin":
         return _read_with_apple_vision(image)

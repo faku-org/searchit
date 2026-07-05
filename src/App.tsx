@@ -49,6 +49,7 @@ import {
   renameIdentity,
   retryAllFailedPhotos,
   searchPhotos,
+  updateEvent,
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
 import { setApiBaseUrl } from "./lib/settings";
@@ -318,6 +319,14 @@ function App() {
     setImportPrompt({ eventName: created.name, folderPath: created.folderPath });
   }
 
+  async function handleToggleEventSportsMode(
+    eventId: string,
+    sportsMode: boolean,
+  ) {
+    await updateEvent(eventId, { sportsMode });
+    refreshEvents();
+  }
+
   async function handleCreateLocation(
     body: Parameters<typeof createLocation>[0],
   ) {
@@ -490,6 +499,9 @@ function App() {
               filters={filters}
               onChange={setFilters}
               onSubmit={() => void runSearch()}
+              onToggleEventSportsMode={(eventId, sportsMode) =>
+                void handleToggleEventSportsMode(eventId, sportsMode)
+              }
               isLoading={isLoading}
               visualSearchEnabled={visualSearchEnabled}
             />
