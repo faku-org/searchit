@@ -51,6 +51,12 @@ button {
   @apply cursor-pointer;
 }
 
+/* Continuous-curvature "squircle" shape for avatar/identity thumbnails,
+   swapped in for rounded-full per issue #1 (premium feel). */
+.squircle {
+  clip-path: url(#squircle-clip);
+}
+
 /*
  * Brand palette (#0F2854 / #1C4D8D / #4988C4 / #BDE8F5) extended into a full
  * dark-mode scale. This app is dark-only -- the reference design has no light
