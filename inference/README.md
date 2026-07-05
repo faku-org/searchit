@@ -84,30 +84,55 @@ The Apple Vision path in `ocr_native.py` is written against Apple's documented
 Vision APIs but hasn't been run on an actual Mac yet -- re-verify it there
 before relying on it.
 
-## Real inference, DeepSeek-OCR-2 tier (NVIDIA CUDA box only)
+## Real inference, DeepSeek-OCR-2 tier (NVIDIA CUDA or Apple Silicon MPS)
 
-`app.py`'s `_use_deepseek_ocr` switches `/read-scene-text` to this tier
-automatically whenever `OCR_MODEL_PATH` is set *and* a CUDA-capable torch is
-importable -- otherwise it always falls back to `ocr_native.py`, even if
-`OCR_MODEL_PATH` is configured. This tier is torch+CUDA only and multi-GB, so
-it's opt-in and never used on a plain desktop client:
+`config.resolve_ocr_backend()` decides whether `/read-scene-text` uses this
+tier, based on `OCR_TIER` (env var, default `auto`):
+
+- `auto` (default): uses DeepSeek-OCR-2 only when `OCR_MODEL_PATH` is set
+  *and* the detected hardware looks comfortably capable of running it --
+  `hardware.py`'s `cuda_capable()` (an NVIDIA GPU with >=8GB VRAM, via
+  `nvidia-smi`) or `mps_capable()` (an Apple Silicon Mac with >=16GB unified
+  memory, via `sysctl hw.memsize`). Otherwise falls back to `ocr_native.py`,
+  same as before this setting existed -- **auto never triggers the ~6.8GB
+  weight download by itself**; that only happens once `OCR_MODEL_PATH` is
+  configured (step 3 below), which is meant to be an explicit, opted-into
+  step (a client-side "enable high-quality OCR?" flow), not something that
+  happens just because a box has a good GPU.
+- `native`: always use the OS-native/ONNX tier regardless of hardware.
+- `deepseek`: force this tier if `OCR_MODEL_PATH` is set, preferring CUDA
+  over MPS over falling back to native (never CPU -- a multi-GB transformer
+  on CPU is too slow to be worth it), even if the detected VRAM/memory looks
+  thin. Logs a warning and falls back to native if forced but genuinely
+  impossible (no weights configured, or no CUDA/MPS device at all).
+
+This tier is torch-only (CUDA or MPS) and multi-GB, so it's still opt-in and
+never used on a plain desktop client that hasn't configured `OCR_MODEL_PATH`:
 
 1. Install the ML extra: `uv sync --extra ml`
-2. (Optional) Install `flash-attn` separately (needs a CUDA toolchain to
-   build): `uv pip install flash-attn==2.7.3 --no-build-isolation`. This
-   reliably builds on Linux; on Windows it usually isn't worth fighting the
-   MSVC/nvcc toolchain for -- `ocr.py` detects whether `flash_attn` is
+2. (Optional, CUDA only) Install `flash-attn` separately (needs a CUDA
+   toolchain to build): `uv pip install flash-attn==2.7.3 --no-build-isolation`.
+   This reliably builds on Linux; on Windows it usually isn't worth fighting
+   the MSVC/nvcc toolchain for -- `ocr.py` detects whether `flash_attn` is
    importable and falls back to eager attention automatically when it isn't,
-   so it's safe to skip.
+   so it's safe to skip. There's no MPS build of flash-attn at all -- Mac
+   always uses eager attention.
 3. Download model weights: OCR uses `deepseek-ai/DeepSeek-OCR-2` from Hugging
    Face (auto-downloads on first use, ~6.8GB).
 4. Set in `.env`:
    ```
    INFERENCE_MOCK=false
-   SEARCHIT_DEVICE=cuda
    OCR_MODEL_PATH=deepseek-ai/DeepSeek-OCR-2  # or a local checkout path
+   # OCR_TIER=auto is the default and usually right -- set OCR_TIER=deepseek
+   # to force it, or OCR_TIER=native to force the OS-native tier instead.
    ```
 5. `uv run uvicorn app:app --port 8000`
+
+The Mac/MPS path (`_load_model()` in `ocr.py`) is written against documented
+PyTorch MPS APIs but hasn't been run on real Apple Silicon hardware yet --
+same caveat as the Apple Vision path in `ocr_native.py`. If `model.to(torch.bfloat16)`
+errors out on a real Mac (MPS bf16 op coverage has historically lagged CUDA's),
+try `torch.float16` instead for that device.
 
 `ocr.py` calls DeepSeek-OCR-2's custom `model.infer(...)` method per its model
 card. That API's exact return shape isn't fully consistent across the
