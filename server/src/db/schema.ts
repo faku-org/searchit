@@ -1,6 +1,5 @@
 import { relations } from "drizzle-orm";
 import {
-  boolean,
   doublePrecision,
   index,
   integer,
@@ -37,16 +36,21 @@ export interface Bbox {
   height: number;
 }
 
+export const eventCategoryEnum = pgEnum("event_category", [
+  "sports",
+  "vacation",
+  "general",
+  "custom",
+]);
+
 export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   startsAt: timestamp("starts_at", { withTimezone: true }),
-  // Bib numbers on race photos are small/angled text that the OS-native OCR
-  // tier (ocr_native.py's Windows.Media.Ocr/Apple Vision) tends to miss --
-  // this forces the bundled RapidOCR ONNX model instead, on every platform,
-  // for this event's photos.
-  sportsMode: boolean("sports_mode").notNull().default(false),
+  category: eventCategoryEnum("category").notNull().default("general"),
+  customOcrMinConfidence: real("custom_ocr_min_confidence"),
+  customFaceMatchMaxDistance: real("custom_face_match_max_distance"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

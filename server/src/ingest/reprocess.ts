@@ -76,7 +76,13 @@ async function reprocessPhotoInternal(
         .where(eq(photos.id, photoId));
     }
 
-    await runInferencePipeline(photoId, previewPath, faceThumbnailDir);
+    await runInferencePipeline(
+      photoId,
+      photo.eventId,
+      photo.originalPath,
+      previewPath,
+      faceThumbnailDir,
+    );
 
     await db
       .update(photos)

@@ -7,29 +7,51 @@ export interface BoundingBox {
   height: number;
 }
 
+// Biases the ingest pipeline's OCR confidence floor and face-match distance
+// per event: "sports" leans on bib-number OCR over face identity, "vacation"/
+// "general" flip that, "custom" lets a specific event hand-tune both numbers
+// (see server/src/ingest/eventWeights.ts).
+export type EventCategory = "sports" | "vacation" | "general" | "custom";
+
+export interface EventWeights {
+  ocrMinConfidence: number;
+  faceMatchMaxDistance: number;
+}
+
 export interface EventSummary {
   id: string;
   name: string;
   slug: string;
   startsAt: string | null;
   photoCount: number;
-  sportsMode: boolean;
+  category: EventCategory;
+  customOcrMinConfidence: number | null;
+  customFaceMatchMaxDistance: number | null;
 }
 
 export interface CreateEventRequestBody {
   name: string;
   slug?: string;
   startsAt?: string;
-  sportsMode?: boolean;
-}
-
-export interface UpdateEventRequestBody {
-  sportsMode: boolean;
+  category?: EventCategory;
+  customOcrMinConfidence?: number;
+  customFaceMatchMaxDistance?: number;
 }
 
 export interface CreateEventResponseBody extends EventSummary {
   /** Watch-dir subfolder created for this event, for the "drop photos here" prompt. */
   folderPath: string;
+}
+
+export interface UpdateEventRequestBody {
+  category: EventCategory;
+  customOcrMinConfidence?: number;
+  customFaceMatchMaxDistance?: number;
+}
+
+export interface UpdateEventResponseBody extends EventSummary {
+  /** Already-ingested photos in this event queued for reprocessing under the new weights. */
+  reprocessQueued: number;
 }
 
 export interface LocationSummary {
@@ -137,8 +159,7 @@ export interface EmbedTextResponseBody {
 
 export interface ReadSceneTextRequestBody {
   imagePath: string;
-  /** Forces the higher-accuracy OCR tier (RapidOCR, or DeepSeek-OCR-2 on a CUDA box) for bib-number-heavy race photos. */
-  sportsMode?: boolean;
+  minConfidence?: number;
 }
 
 export interface ReadSceneTextResponseBody {

@@ -51,11 +51,11 @@ export function embedText(text: string): Promise<EmbedTextResponseBody> {
 
 export function readSceneText(
   imagePath: string,
-  sportsMode = false,
+  minConfidence?: number,
 ): Promise<ReadSceneTextResponseBody> {
   return postJson<ReadSceneTextResponseBody>("/read-scene-text", {
     imagePath,
-    sportsMode,
+    minConfidence,
   });
 }
 

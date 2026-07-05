@@ -21,6 +21,7 @@ import type {
   SelectRegionResponseBody,
   StatsResponseBody,
   UpdateEventRequestBody,
+  UpdateEventResponseBody,
 } from "@searchit/shared";
 import { getApiBaseUrl } from "./settings";
 
@@ -93,7 +94,7 @@ export function createEvent(
 export function updateEvent(
   id: string,
   body: UpdateEventRequestBody,
-): Promise<EventSummary> {
+): Promise<UpdateEventResponseBody> {
   return apiJsonRequest("PATCH", `/events/${id}`, body);
 }
 

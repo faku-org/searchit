@@ -128,10 +128,10 @@ class EmbedTextResponse(BaseModel):
 
 class ReadSceneTextRequest(BaseModel):
     imagePath: str
-    # Race-photo bib numbers are small/angled text that the OS-native OCR
-    # tier tends to miss -- this forces the higher-accuracy tier (RapidOCR,
-    # or DeepSeek-OCR-2 when a CUDA box has it configured) instead.
-    sportsMode: bool = False
+    # Drops low-score per-line OCR detections before joining them into the
+    # returned text -- see ocr_native.py's read_scene_text for which backends
+    # actually honor this.
+    minConfidence: float | None = None
 
 
 class ReadSceneTextResponse(BaseModel):
@@ -229,7 +229,7 @@ def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextRespons
         from ocr_native import read_scene_text
 
         with Image.open(image_path) as img:
-            text = read_scene_text(img.convert("RGB"), force_rapidocr=body.sportsMode)
+            text = read_scene_text(img.convert("RGB"), min_confidence=body.minConfidence)
     _log_rss("read-scene-text")
     return ReadSceneTextResponse(text=text)
 

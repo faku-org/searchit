@@ -16,6 +16,7 @@ const FACE_MATCH_MAX_DISTANCE = Number(
  */
 export async function resolveIdentityForEmbedding(
   embedding: number[],
+  maxDistance: number = FACE_MATCH_MAX_DISTANCE,
 ): Promise<string> {
   const [nearest] = await db
     .select({
@@ -29,10 +30,7 @@ export async function resolveIdentityForEmbedding(
     .orderBy(cosineDistance(faceEmbeddings.embedding, embedding))
     .limit(1);
 
-  if (
-    nearest?.identityId &&
-    nearest.distance <= FACE_MATCH_MAX_DISTANCE
-  ) {
+  if (nearest?.identityId && nearest.distance <= maxDistance) {
     return nearest.identityId;
   }
 

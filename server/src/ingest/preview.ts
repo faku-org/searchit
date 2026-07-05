@@ -15,6 +15,12 @@ const RAW_EXTENSIONS = new Set([
 ]);
 
 const PREVIEW_MAX_DIMENSION = 2048;
+// OCR needs far more pixels per character than the face/CLIP pipeline or the
+// on-screen preview do -- a bib number that's a small, wrinkled, motion-blurred
+// tag in the original photo becomes unreadable once downscaled to the shared
+// 2048px display preview. Capped higher (not uncapped) so an unusually huge
+// source file doesn't blow up OCR latency/memory for no further benefit.
+const OCR_SOURCE_MAX_DIMENSION = 4096;
 
 export function isRawFile(filePath: string): boolean {
   return RAW_EXTENSIONS.has(path.extname(filePath).toLowerCase());
@@ -63,6 +69,38 @@ export async function generatePreview(
     .toFile(previewPath);
 
   return { previewPath, width, height };
+}
+
+/**
+ * Same source handling as generatePreview (RAW extraction, EXIF rotation) but
+ * capped much higher and written to a fresh temp file for the caller to
+ * delete -- a dedicated working copy for OCR only, since the display preview
+ * that's plenty for the photo grid/detail panel is often too small to
+ * resolve a bib number shot from a few meters away.
+ */
+export async function generateOcrSourceImage(
+  sourcePath: string,
+  tempDir: string,
+): Promise<string> {
+  await mkdir(tempDir, { recursive: true });
+  const tempPath = path.join(tempDir, `${crypto.randomUUID()}.jpg`);
+
+  const sourceBuffer = isRawFile(sourcePath)
+    ? await extractRawPreview(sourcePath)
+    : Buffer.from(await Bun.file(sourcePath).arrayBuffer());
+
+  await sharp(sourceBuffer)
+    .rotate()
+    .resize({
+      width: OCR_SOURCE_MAX_DIMENSION,
+      height: OCR_SOURCE_MAX_DIMENSION,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 95 })
+    .toFile(tempPath);
+
+  return tempPath;
 }
 
 /**

@@ -1,15 +1,25 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import type { CreateEventResponseBody, EventSummary } from "@searchit/shared";
+import type {
+  CreateEventResponseBody,
+  EventSummary,
+  UpdateEventResponseBody,
+} from "@searchit/shared";
 import { db } from "../db/client";
 import { events, photos } from "../db/schema";
+import { enqueue } from "../ingest/queue";
+import { reprocessPhoto } from "../ingest/reprocess";
 
 // Recomputed from env here rather than imported from index.ts, same pattern
 // as PREVIEW_DIR in routes/developer.ts -- index.ts already validated this is
 // set at boot.
 const WATCH_DIR = path.resolve(process.env.SEARCHIT_WATCH_DIR ?? "");
+const PREVIEW_DIR = path.resolve(process.env.SEARCHIT_PREVIEW_DIR ?? "");
+const FACE_THUMBNAIL_DIR = path.resolve(
+  process.env.SEARCHIT_FACE_THUMBNAIL_DIR ?? "",
+);
 
 function slugify(name: string): string {
   return (
@@ -30,7 +40,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         slug: events.slug,
         startsAt: events.startsAt,
         createdAt: events.createdAt,
-        sportsMode: events.sportsMode,
+        category: events.category,
+        customOcrMinConfidence: events.customOcrMinConfidence,
+        customFaceMatchMaxDistance: events.customFaceMatchMaxDistance,
         photoCount: sql<number>`count(${photos.id})`.mapWith(Number),
       })
       .from(events)
@@ -44,7 +56,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
       slug: row.slug,
       startsAt: row.startsAt ? row.startsAt.toISOString() : null,
       photoCount: row.photoCount,
-      sportsMode: row.sportsMode,
+      category: row.category,
+      customOcrMinConfidence: row.customOcrMinConfidence,
+      customFaceMatchMaxDistance: row.customFaceMatchMaxDistance,
     }));
   })
   .post(
@@ -59,7 +73,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
             name: body.name,
             slug,
             startsAt: body.startsAt ? new Date(body.startsAt) : null,
-            sportsMode: body.sportsMode ?? false,
+            category: body.category ?? "general",
+            customOcrMinConfidence: body.customOcrMinConfidence ?? null,
+            customFaceMatchMaxDistance: body.customFaceMatchMaxDistance ?? null,
           })
           .returning();
 
@@ -81,7 +97,9 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           slug: created.slug,
           startsAt: created.startsAt ? created.startsAt.toISOString() : null,
           photoCount: 0,
-          sportsMode: created.sportsMode,
+          category: created.category,
+          customOcrMinConfidence: created.customOcrMinConfidence,
+          customFaceMatchMaxDistance: created.customFaceMatchMaxDistance,
           folderPath,
         };
       } catch {
@@ -94,16 +112,31 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         name: t.String({ minLength: 1 }),
         slug: t.Optional(t.String()),
         startsAt: t.Optional(t.String()),
-        sportsMode: t.Optional(t.Boolean()),
+        category: t.Optional(
+          t.Union([
+            t.Literal("sports"),
+            t.Literal("vacation"),
+            t.Literal("general"),
+            t.Literal("custom"),
+          ]),
+        ),
+        customOcrMinConfidence: t.Optional(t.Number({ minimum: 0, maximum: 1 })),
+        customFaceMatchMaxDistance: t.Optional(t.Number({ minimum: 0, maximum: 2 })),
       }),
     },
   )
   .patch(
     "/:id",
-    async ({ params, body, set }) => {
+    async ({ params, body, set }): Promise<UpdateEventResponseBody | { error: string }> => {
       const [updated] = await db
         .update(events)
-        .set({ sportsMode: body.sportsMode })
+        .set({
+          category: body.category,
+          customOcrMinConfidence:
+            body.category === "custom" ? (body.customOcrMinConfidence ?? null) : null,
+          customFaceMatchMaxDistance:
+            body.category === "custom" ? (body.customFaceMatchMaxDistance ?? null) : null,
+        })
         .where(eq(events.id, params.id))
         .returning();
 
@@ -117,19 +150,47 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
         .from(photos)
         .where(eq(photos.eventId, updated.id));
 
-      const response: EventSummary = {
+      // Switching an event's category is meant to fix photos already sitting
+      // in the archive with the wrong weights (e.g. missed bib numbers), not
+      // just photos ingested from here on -- so re-run every already-previewed
+      // photo in this event through the shared bounded queue with the new
+      // weights (resolveEventWeights re-reads the row's now-updated category).
+      const candidates = await db
+        .select({ id: photos.id })
+        .from(photos)
+        .where(and(eq(photos.eventId, updated.id), isNotNull(photos.previewPath)));
+
+      for (const candidate of candidates) {
+        enqueue(() =>
+          reprocessPhoto(candidate.id, PREVIEW_DIR, FACE_THUMBNAIL_DIR),
+        ).catch((error: unknown) => {
+          console.error(`[event-category-change] failed for photo ${candidate.id}:`, error);
+        });
+      }
+
+      return {
         id: updated.id,
         name: updated.name,
         slug: updated.slug,
         startsAt: updated.startsAt ? updated.startsAt.toISOString() : null,
         photoCount: photoCountRow?.value ?? 0,
-        sportsMode: updated.sportsMode,
+        category: updated.category,
+        customOcrMinConfidence: updated.customOcrMinConfidence,
+        customFaceMatchMaxDistance: updated.customFaceMatchMaxDistance,
+        reprocessQueued: candidates.length,
       };
-      return response;
     },
     {
+      params: t.Object({ id: t.String() }),
       body: t.Object({
-        sportsMode: t.Boolean(),
+        category: t.Union([
+          t.Literal("sports"),
+          t.Literal("vacation"),
+          t.Literal("general"),
+          t.Literal("custom"),
+        ]),
+        customOcrMinConfidence: t.Optional(t.Number({ minimum: 0, maximum: 1 })),
+        customFaceMatchMaxDistance: t.Optional(t.Number({ minimum: 0, maximum: 2 })),
       }),
     },
   );
