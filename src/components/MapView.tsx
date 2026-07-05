@@ -103,7 +103,7 @@ export function MapView({
       L.marker(point, { icon: photoIcon() })
         .addTo(layer)
         .bindPopup(
-          `<div style="max-width:160px;font-family:'IBM Plex Sans',sans-serif">
+          `<div style="max-width:160px;font-family:'Plus Jakarta Sans',sans-serif">
             <img src="${previewUrl(photo.id)}" style="width:100%;border-radius:8px;margin-bottom:4px" />
             <div style="font-size:12px;color:#0F2854">${escapeHtml(photo.filename)}</div>
           </div>`,
@@ -117,7 +117,7 @@ export function MapView({
       L.marker(point, { icon: locationIcon() })
         .addTo(layer)
         .bindPopup(
-          `<b style="font-family:'IBM Plex Serif',serif;color:#0F2854">${escapeHtml(location.name)}</b>`,
+          `<b style="font-family:'Playfair Display',serif;color:#0F2854">${escapeHtml(location.name)}</b>`,
         );
     }
 

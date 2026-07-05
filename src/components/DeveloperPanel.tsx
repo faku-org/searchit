@@ -2,29 +2,57 @@ import { useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  FileText,
+  FolderOpen,
   HardDrive,
   ImageOff,
   type LucideIcon,
+  RefreshCw,
   RotateCw,
 } from "lucide-react";
 import { motion } from "motion/react";
 import type { DeveloperStatsResponseBody, FailedPhotoSummary } from "@searchit/shared";
-import { getDeveloperStats, getFailedPhotos, retryFailedPhoto } from "../lib/api";
+import {
+  getDeveloperStats,
+  getFailedPhotos,
+  retryAllFailedPhotos,
+  retryFailedPhoto,
+} from "../lib/api";
 import { useTranslation } from "../lib/i18n";
+import {
+  getLogFilePath,
+  getSidecarLogs,
+  getSidecarStatus,
+  restartInference,
+  restartServer,
+  revealInFileManager,
+  type SidecarStatus,
+  type SidecarStatuses,
+} from "../lib/tauri";
 import {
   secondaryButton,
   springTransition,
   staggerContainer,
   staggerItem,
 } from "../lib/theme";
+import { useToast } from "../lib/toast";
 
 const POLL_INTERVAL_MS = 5000;
+const LOG_LINES = 300;
 
 export function DeveloperPanel() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<DeveloperStatsResponseBody | null>(null);
   const [failedPhotos, setFailedPhotos] = useState<FailedPhotoSummary[]>([]);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [isRetryingAll, setIsRetryingAll] = useState(false);
+  const [sidecarStatus, setSidecarStatus] = useState<SidecarStatuses | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const [logs, setLogs] = useState("");
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [isRestartingServer, setIsRestartingServer] = useState(false);
+  const [isRestartingInference, setIsRestartingInference] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function refresh(options?: { silent?: boolean }) {
@@ -39,6 +67,11 @@ export function DeveloperPanel() {
           setError(err instanceof Error ? err.message : String(err));
         }
       });
+    // Not running inside the Tauri shell (e.g. plain `bun dev`) rejects this --
+    // leave sidecarStatus null so the diagnostics card just shows placeholders.
+    getSidecarStatus()
+      .then(setSidecarStatus)
+      .catch(() => setSidecarStatus(null));
   }
 
   useEffect(() => {
@@ -57,6 +90,94 @@ export function DeveloperPanel() {
     } finally {
       setRetryingId(null);
     }
+  }
+
+  async function handleRetryAll() {
+    setIsRetryingAll(true);
+    try {
+      const result = await retryAllFailedPhotos();
+      refresh({ silent: true });
+      showToast(
+        t("developer.retryAllResult", {
+          succeeded: result.succeeded,
+          attempted: result.attempted,
+        }),
+        result.succeeded === result.attempted ? "success" : "error",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsRetryingAll(false);
+    }
+  }
+
+  async function handleToggleLogs() {
+    if (showLogs) {
+      setShowLogs(false);
+      return;
+    }
+    setShowLogs(true);
+    setLogsLoading(true);
+    try {
+      setLogs(await getSidecarLogs(LOG_LINES));
+    } catch {
+      setLogs("");
+    } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  async function handleOpenLogFile() {
+    try {
+      await revealInFileManager(await getLogFilePath());
+    } catch {
+      // Not running inside the Tauri shell -- nothing to reveal.
+    }
+  }
+
+  async function handleRestartServer() {
+    setIsRestartingServer(true);
+    try {
+      await restartServer();
+      refresh({ silent: true });
+      showToast(t("developer.serverRestarted"), "success");
+    } catch (err) {
+      showToast(
+        t("developer.restartFailed", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        "error",
+      );
+    } finally {
+      setIsRestartingServer(false);
+    }
+  }
+
+  async function handleRestartInference() {
+    setIsRestartingInference(true);
+    try {
+      await restartInference();
+      refresh({ silent: true });
+      showToast(t("developer.inferenceRestarted"), "success");
+    } catch (err) {
+      showToast(
+        t("developer.restartFailed", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        "error",
+      );
+    } finally {
+      setIsRestartingInference(false);
+    }
+  }
+
+  function processStatusLabel(status: SidecarStatus | undefined): string {
+    if (!status) return "--";
+    if (status.running) return t("developer.processRunning");
+    if (status.lastExitCode !== null && status.lastExitCode !== undefined) {
+      return t("developer.processCrashed", { code: status.lastExitCode });
+    }
+    return t("developer.processStopped");
   }
 
   const total = stats ? stats.currentlyIndexed + stats.queue + stats.processing : 0;
@@ -111,13 +232,82 @@ export function DeveloperPanel() {
               [t("developer.serverPort"), stats?.serverPort],
             ]}
           />
+          <StatsCard
+            title={t("developer.diagnostics")}
+            icon={FileText}
+            rows={[
+              [t("developer.serverProcess"), processStatusLabel(sidecarStatus?.server)],
+              [t("developer.inferenceProcess"), processStatusLabel(sidecarStatus?.inference)],
+              [t("developer.lastError"), sidecarStatus?.inference.lastError ?? undefined],
+            ]}
+          />
+          <div className="flex gap-2 rounded-2xl border border-navy-800 bg-navy-900 p-4">
+            <button
+              type="button"
+              disabled={isRestartingServer}
+              onClick={() => void handleRestartServer()}
+              className={secondaryButton}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isRestartingServer ? "animate-spin" : ""}`} />
+              {isRestartingServer ? t("developer.restarting") : t("developer.restartServer")}
+            </button>
+            <button
+              type="button"
+              disabled={isRestartingInference}
+              onClick={() => void handleRestartInference()}
+              className={secondaryButton}
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isRestartingInference ? "animate-spin" : ""}`}
+              />
+              {isRestartingInference ? t("developer.restarting") : t("developer.restartInference")}
+            </button>
+          </div>
+          <div className="flex flex-col gap-2 rounded-2xl border border-navy-800 bg-navy-900 p-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleToggleLogs()}
+                className={secondaryButton}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {showLogs ? t("developer.hideLogs") : t("developer.viewLogs")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleOpenLogFile()}
+                className={secondaryButton}
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                {t("developer.openLogFile")}
+              </button>
+            </div>
+            {showLogs && (
+              <pre className="max-h-64 overflow-auto rounded-xl bg-navy-950 p-3 text-xs text-mist-300">
+                {logsLoading ? t("photoDetail.loading") : logs || t("developer.noLogs")}
+              </pre>
+            )}
+          </div>
         </div>
 
         <div>
-          <h3 className="mb-3 flex items-center gap-2 font-serif text-lg font-semibold text-mist-100">
-            <AlertTriangle className="h-4 w-4 text-rose-400" />
-            {t("developer.failedPhotos")}
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-serif text-lg font-semibold text-mist-100">
+              <AlertTriangle className="h-4 w-4 text-rose-400" />
+              {t("developer.failedPhotos")}
+            </h3>
+            {failedPhotos.length > 0 && (
+              <button
+                type="button"
+                disabled={isRetryingAll}
+                onClick={() => void handleRetryAll()}
+                className={secondaryButton}
+              >
+                <RotateCw className={`h-3.5 w-3.5 ${isRetryingAll ? "animate-spin" : ""}`} />
+                {isRetryingAll ? t("developer.retryingAll") : t("developer.retryAll")}
+              </button>
+            )}
+          </div>
           {failedPhotos.length === 0 ? (
             <p className="text-sm text-mist-500">{t("developer.noFailedPhotos")}</p>
           ) : (
@@ -125,7 +315,7 @@ export function DeveloperPanel() {
               variants={staggerContainer}
               initial="hidden"
               animate="show"
-              className="flex flex-col gap-2"
+              className="flex max-h-[99vh] flex-col gap-2 overflow-y-auto"
             >
               {failedPhotos.map((photo) => (
                 <motion.li

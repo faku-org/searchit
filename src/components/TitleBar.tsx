@@ -35,7 +35,7 @@ export function TitleBar() {
     >
       <span
         data-tauri-drag-region
-        className="pl-3 font-serif text-xs font-medium text-mist-300"
+        className="pl-3 font-sans text-xs font-medium text-mist-300"
       >
         SearchIt
       </span>
