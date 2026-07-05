@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>SearchIt needs access to your Documents folder to watch and index photos placed there.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>SearchIt needs access to your Desktop folder to watch and index photos placed there.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>SearchIt needs access to your Downloads folder to watch and index photos placed there.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>SearchIt needs access to your Photos library to index and process photos you select for watching.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>SearchIt needs access to removable volumes to watch and index photos stored there.</string>
+</dict>
+</plist>
