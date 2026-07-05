@@ -21,6 +21,11 @@ export interface CreateEventRequestBody {
   startsAt?: string;
 }
 
+export interface CreateEventResponseBody extends EventSummary {
+  /** Watch-dir subfolder created for this event, for the "drop photos here" prompt. */
+  folderPath: string;
+}
+
 export interface LocationSummary {
   id: string;
   name: string;
@@ -147,10 +152,6 @@ export interface BackfillResponseBody {
   queued: number;
 }
 
-export interface ReprocessFailedResponseBody {
-  queued: number;
-}
-
 export interface ConfigResponseBody {
   /** Absolute path the server watches for new photos to ingest. */
   watchDir: string;
@@ -210,7 +211,7 @@ export interface DeveloperStatsResponseBody {
   inferencePort: number | null;
   serverStatus: "nominal";
   serverPort: number;
-  /** Photos with status "failed". */
+  /** Photos with status "failed", regardless of the /failed-photos list limit. */
   failedCount: number;
 }
 
@@ -223,4 +224,9 @@ export interface FailedPhotoSummary {
 export interface RetryPhotoResponseBody {
   id: string;
   status: PhotoStatus;
+}
+
+export interface RetryAllPhotosResponseBody {
+  attempted: number;
+  succeeded: number;
 }

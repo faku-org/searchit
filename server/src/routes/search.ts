@@ -74,6 +74,7 @@ export const searchRoutes = new Elysia().get(
         eventId: photos.eventId,
         filename: photos.filename,
         takenAt: photos.takenAt,
+        createdAt: photos.createdAt,
         gpsLat: photos.gpsLat,
         gpsLon: photos.gpsLon,
         status: photos.status,
@@ -143,8 +144,12 @@ export const searchRoutes = new Elysia().get(
             cosineSimilarity(a.imageEmbedding!, visualQueryEmbedding),
         );
     } else {
+      // Sorted by ingest time (createdAt), not EXIF takenAt -- a batch of
+      // newly-arrived photos should surface immediately regardless of
+      // whether their taken-at metadata is missing, wrong, or just older
+      // than photos ingested earlier from a different source.
       results = [...results].sort(
-        (a, b) => (b.takenAt?.getTime() ?? 0) - (a.takenAt?.getTime() ?? 0),
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
       );
     }
 

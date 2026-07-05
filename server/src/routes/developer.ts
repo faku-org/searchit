@@ -4,6 +4,7 @@ import { Elysia, t } from "elysia";
 import type {
   DeveloperStatsResponseBody,
   FailedPhotoSummary,
+  RetryAllPhotosResponseBody,
   RetryPhotoResponseBody,
 } from "@searchit/shared";
 import { db } from "../db/client";
@@ -109,4 +110,19 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
       return { id: photo.id, status: updated?.status ?? photo.status };
     },
     { params: t.Object({ id: t.String() }) },
-  );
+  )
+  .post("/failed-photos/retry-all", async (): Promise<RetryAllPhotosResponseBody> => {
+    const rows = await db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(eq(photos.status, "failed"));
+
+    const results = await Promise.allSettled(
+      rows.map((photo) =>
+        enqueue(() => reprocessPhoto(photo.id, PREVIEW_DIR, FACE_THUMBNAIL_DIR)),
+      ),
+    );
+    const succeeded = results.filter((result) => result.status === "fulfilled").length;
+
+    return { attempted: rows.length, succeeded };
+  });
