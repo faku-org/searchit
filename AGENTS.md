@@ -103,9 +103,18 @@ then does three independent things per photo — face detection + identity
 matching, CLIP image embedding, OCR scene text — each wrapped so one failing
 doesn't fail the others; a photo stays searchable by date/location/customId
 even if face matching or OCR errors out. Status moves `pending` →
-`processed`/`failed`. The same function is reused for manual reprocess and
-backfill (`routes/photos.ts`), so it always deletes any prior
-face/image-embedding rows first to stay idempotent.
+`processed`/`failed`, and `processedAt` is stamped on success (used by the
+Developer tab's "indexed in the last 10 minutes" stat).
+
+`reingest.ts`'s `processPhotoRow` is the shared post-insert flow (regenerate
+preview if missing, run the pipeline, update status/`processedAt`) — used by
+both the watcher for brand-new files and the Developer tab's failed-photo
+retry action for existing rows. `concurrency.ts`'s `withWorkerSlot` bounds
+how many photos process at once (`SEARCHIT_INGEST_WORKERS`, default 3) and
+exposes the in-flight count, which is what makes "Processing"/"Workers" real
+numbers instead of placeholders. The same `runInferencePipeline` is reused
+for manual reprocess and backfill (`routes/photos.ts`), so it always deletes
+any prior face/image-embedding rows first to stay idempotent.
 
 ### Identity matching (server/src/ingest/faceMatching.ts)
 
@@ -119,6 +128,17 @@ read-only — it ranks candidate identities instead of assigning one, via
 `loadIdentityDetails()` / `rankIdentitiesByFace()`, which both `GET /` and
 `/match-face` share.
 
+### Developer tab (server/src/routes/developer.ts)
+
+Backs the client's "Developer" tab: `GET /developer/stats` (indexed/queue/
+processing counts from `photos.status`, `workers` from `concurrency.ts`,
+inference/server health+port), `GET /developer/failed-photos` (rows with
+`status = "failed"`), and `POST /developer/failed-photos/:id/retry` (calls
+`processPhotoRow` again, so a photo that never got a preview the first time
+still gets one). Ports are re-derived from `PORT`/`INFERENCE_URL` env vars
+rather than imported from `index.ts`, matching the pattern already used for
+`FACE_THUMBNAIL_DIR` in `routes/photos.ts`.
+
 ### Search (server/src/routes/search.ts)
 
 Structured filters (event/date range/geo/customId) combine with either a
@@ -129,17 +149,27 @@ haversine distance filter in JS.
 
 ### Client (src/)
 
-`App.tsx` is the single state owner — tab (`photos`/`people`/`map`), filters,
-selected photo/identity, an in-progress "similarity query" (from a
-region-select "find similar"), pending new-location, etc. Every component
-under `src/components/` is presentational and talks back through callback
-props; all network access goes through `src/lib/api.ts`, a thin fetch wrapper
-against a **runtime-configurable** API base URL persisted in `localStorage`
-(`src/lib/settings.ts`). On launch, `App.tsx` overwrites it with the bundled
-server sidecar's actual dynamically-chosen port (via the `get_backend_url`
-Tauri command) before making any API call; the manual override in the header
-input remains for the power-user case of pointing at a different machine's
-server instead of the local bundled one.
+`App.tsx` is the single state owner — tab (`photos`/`people`/`map`/
+`developer`), filters, selected photo/identity, an in-progress "similarity
+query" (from a region-select "find similar"), pending new-location, etc.
+Every component under `src/components/` is presentational and talks back
+through callback props; all network access goes through `src/lib/api.ts`, a
+thin fetch wrapper against a **runtime-configurable** API base URL persisted
+in `localStorage` (`src/lib/settings.ts`). On launch, `App.tsx` overwrites it
+with the bundled server sidecar's actual dynamically-chosen port (via the
+`get_backend_url` Tauri command) before making any API call; the manual
+override in the header input remains for the power-user case of pointing at
+a different machine's server instead of the local bundled one.
+
+The UI is a single dark navy/blue theme (no light mode) driven by the
+`@theme` tokens in `src/App.css` (brand colors `#0F2854`/`#1C4D8D`/`#4988C4`/
+`#BDE8F5` extended into a full scale) plus shared class fragments in
+`src/lib/theme.ts` -- reuse those tokens/fragments for any new UI rather than
+hardcoding colors. Icons are `lucide-react`, fonts are self-hosted IBM Plex
+Serif (headings) / IBM Plex Sans (body) via `@fontsource/*`, and
+`motion/react` (the `motion` package) drives the small transitions (tab
+indicator, modal enter/exit, grid stagger) — all three are real dependencies
+here, not aspirational.
 
 Photos/events/locations/identities are kept fresh by silent polling
 (`POLL_INTERVAL_MS` in `App.tsx`, `PENDING_POLL_INTERVAL_MS` in

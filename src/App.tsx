@@ -1,5 +1,22 @@
-import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  Aperture,
+  ArrowLeft,
+  CalendarPlus,
+  DownloadCloud,
+  FolderOpen,
+  Globe,
+  Images,
+  Map as MapIcon,
+  MapPinPlus,
+  RefreshCw,
+  ScanFace,
+  Server,
+  Terminal,
+  Users,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type {
   EventSummary,
   IdentitySummary,
@@ -8,6 +25,7 @@ import type {
   SearchFilters,
 } from "@searchit/shared";
 import "./App.css";
+import { DeveloperPanel } from "./components/DeveloperPanel";
 import { IdentifyByPhotoModal } from "./components/IdentifyByPhotoModal";
 import { MapView } from "./components/MapView";
 import { NewEventModal } from "./components/NewEventModal";
@@ -35,6 +53,7 @@ import {
   pickWatchFolder,
   setWatchDir as setServerWatchDir,
 } from "./lib/tauri";
+import { iconButton, pill, primaryButton } from "./lib/theme";
 import {
   checkForUpdate,
   installPendingUpdate,
@@ -53,7 +72,14 @@ interface PendingLocation {
   lon: number;
 }
 
-type Tab = "photos" | "people" | "map";
+type Tab = "photos" | "people" | "map" | "developer";
+
+const TABS: { key: Tab; labelKey: "nav.photos" | "nav.people" | "nav.map" | "nav.developer"; icon: typeof Images }[] = [
+  { key: "photos", labelKey: "nav.photos", icon: Images },
+  { key: "people", labelKey: "nav.people", icon: Users },
+  { key: "map", labelKey: "nav.map", icon: MapIcon },
+  { key: "developer", labelKey: "nav.developer", icon: Terminal },
+];
 
 function App() {
   const { t, locale, setLocale } = useTranslation();
@@ -292,42 +318,54 @@ function App() {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+    <main className="flex h-screen flex-col bg-navy-950 font-sans text-mist-100">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-800 px-4 py-3">
         <div className="flex items-center gap-4">
-          <h1 className="text-sm font-semibold">SearchIt</h1>
-          <nav className="flex gap-1 text-sm">
-            <TabButton
-              active={tab === "photos"}
-              onClick={() => setTab("photos")}
-            >
-              {t("nav.photos")}
-            </TabButton>
-            <TabButton
-              active={tab === "people"}
-              onClick={() => {
-                setTab("people");
-                setSelectedIdentity(null);
-              }}
-            >
-              {t("nav.people")}
-            </TabButton>
-            <TabButton active={tab === "map"} onClick={() => setTab("map")}>
-              {t("nav.map")}
-            </TabButton>
+          <h1 className="flex items-center gap-1.5 font-serif text-lg font-semibold text-mist-100">
+            <Aperture className="h-5 w-5 text-blue-500" />
+            SearchIt
+          </h1>
+          <nav className="relative flex items-center gap-1 rounded-full border border-navy-800 bg-navy-900/60 p-1 text-sm">
+            {TABS.map(({ key, labelKey, icon: Icon }) => {
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setTab(key);
+                    if (key === "people") setSelectedIdentity(null);
+                  }}
+                  className={`relative z-10 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                    active ? "text-navy-950" : "text-mist-300 hover:text-mist-100"
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="tab-indicator"
+                      className="absolute inset-0 -z-10 rounded-full bg-blue-500"
+                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <Icon className="h-3.5 w-3.5" />
+                  {t(labelKey)}
+                </button>
+              );
+            })}
           </nav>
         </div>
-        <div className="flex items-center gap-2 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-2">
           {tab === "map" && (
             <button
               type="button"
               onClick={() => setIsTaggingLocation((current) => !current)}
-              className={`rounded border px-2 py-1 ${
+              className={
                 isTaggingLocation
-                  ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-                  : "border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              }`}
+                  ? "inline-flex items-center gap-1.5 rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-navy-950"
+                  : pill
+              }
             >
+              <MapPinPlus className="h-3.5 w-3.5" />
               {isTaggingLocation
                 ? t("header.tagLocationActive")
                 : t("header.tagLocation")}
@@ -337,73 +375,78 @@ function App() {
             <button
               type="button"
               onClick={() => setShowIdentifyModal(true)}
-              className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              className={pill}
             >
+              <ScanFace className="h-3.5 w-3.5" />
               {t("people.identifyByPhoto")}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowNewEventModal(true)}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
+          <button type="button" onClick={() => setShowNewEventModal(true)} className={pill}>
+            <CalendarPlus className="h-3.5 w-3.5" />
             {t("header.newEvent")}
           </button>
-          <button
-            type="button"
-            onClick={() => void handleBackfill()}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
+          <button type="button" onClick={() => void handleBackfill()} className={pill}>
+            <RefreshCw className="h-3.5 w-3.5" />
             {t("header.backfill")}
           </button>
           <button
             type="button"
             disabled={isCheckingUpdate}
             onClick={() => void handleCheckForUpdate()}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            className={pill}
           >
+            <DownloadCloud className="h-3.5 w-3.5" />
             {isCheckingUpdate ? t("update.checking") : t("update.check")}
           </button>
           <button
             type="button"
             onClick={() => setLocale(locale === "en" ? "es" : "en")}
             title="Language / Idioma"
-            className="rounded border border-neutral-300 px-2 py-1 font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            className={pill}
           >
+            <Globe className="h-3.5 w-3.5" />
             {locale === "en" ? "ES" : "EN"}
           </button>
-          <span>{t("header.server")}</span>
-          <input
-            type="text"
-            value={apiBaseUrlInput}
-            onChange={(event) => setApiBaseUrlInput(event.target.value)}
-            onBlur={() => setApiBaseUrl(apiBaseUrlInput)}
-            className="w-56 rounded border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          />
+          <label className="flex items-center gap-1.5 rounded-full border border-navy-700 bg-navy-800/80 px-3 py-1.5 text-xs text-mist-300">
+            <Server className="h-3.5 w-3.5 shrink-0" />
+            <input
+              type="text"
+              value={apiBaseUrlInput}
+              onChange={(event) => setApiBaseUrlInput(event.target.value)}
+              onBlur={() => setApiBaseUrl(apiBaseUrlInput)}
+              className="w-40 bg-transparent text-mist-100 outline-none"
+            />
+          </label>
         </div>
       </header>
 
       {watchDir && (
-        <p className="flex items-center gap-2 truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
+        <p className="flex items-center gap-2 truncate border-b border-navy-900 px-4 py-1.5 text-xs text-mist-500">
+          <FolderOpen className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">
             {t("header.watchDir", { path: watchDir })}
           </span>
           <button
             type="button"
             onClick={() => void handleChangeWatchDir()}
-            className="shrink-0 rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            className="shrink-0 rounded-full border border-navy-700 px-2 py-0.5 hover:bg-navy-800"
           >
             {t("header.changeWatchDir")}
           </button>
         </p>
       )}
 
-      {error && <p className="px-4 py-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="flex items-center gap-2 px-4 py-2 text-sm text-rose-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {error}
+        </p>
+      )}
       {statusMessage && (
-        <p className="px-4 py-2 text-sm text-neutral-500">{statusMessage}</p>
+        <p className="px-4 py-2 text-sm text-mist-500">{statusMessage}</p>
       )}
       {availableUpdate && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-500">
+        <div className="flex items-center gap-2 px-4 py-2 text-sm text-mist-300">
           <span>
             {t("update.available", { version: availableUpdate.version })}
           </span>
@@ -411,7 +454,7 @@ function App() {
             type="button"
             disabled={isInstallingUpdate}
             onClick={() => void handleInstallUpdate()}
-            className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+            className={primaryButton}
           >
             {isInstallingUpdate ? t("update.installing") : t("update.install")}
           </button>
@@ -421,14 +464,12 @@ function App() {
       {tab === "photos" &&
         (similarityQuery ? (
           <>
-            <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2 text-sm dark:border-neutral-800">
-              <span className="text-neutral-500">
-                {t("similarity.banner")}
-              </span>
+            <div className="flex items-center gap-2 border-b border-navy-800 px-4 py-2 text-sm">
+              <span className="text-mist-500">{t("similarity.banner")}</span>
               <button
                 type="button"
                 onClick={() => setSimilarityQuery(null)}
-                className="text-neutral-500 underline hover:text-neutral-800 dark:hover:text-neutral-200"
+                className="text-blue-400 underline hover:text-blue-300"
               >
                 {t("similarity.clear")}
               </button>
@@ -458,15 +499,15 @@ function App() {
       {tab === "people" &&
         (selectedIdentity ? (
           <>
-            <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+            <div className="flex items-center gap-2 border-b border-navy-800 px-4 py-2">
               <button
                 type="button"
                 onClick={() => setSelectedIdentity(null)}
-                className="text-sm text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                className={iconButton}
               >
-                {t("people.back")}
+                <ArrowLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm font-medium">
+              <span className="font-serif text-sm font-medium text-mist-100">
                 {selectedIdentity.displayName ?? t("people.unnamedPerson")}
               </span>
             </div>
@@ -495,67 +536,48 @@ function App() {
         />
       )}
 
-      {showNewEventModal && (
-        <NewEventModal
-          onClose={() => setShowNewEventModal(false)}
-          onCreate={handleCreateEvent}
-        />
-      )}
+      {tab === "developer" && <DeveloperPanel />}
 
-      {showIdentifyModal && (
-        <IdentifyByPhotoModal
-          onClose={() => setShowIdentifyModal(false)}
-          onOpenIdentity={(identity) => {
-            setShowIdentifyModal(false);
-            void openIdentity(identity);
-          }}
-          onRename={(id, displayName) =>
-            void handleRenameIdentity(id, displayName)
-          }
-        />
-      )}
+      <AnimatePresence>
+        {showNewEventModal && (
+          <NewEventModal
+            onClose={() => setShowNewEventModal(false)}
+            onCreate={handleCreateEvent}
+          />
+        )}
 
-      {pendingLocation && (
-        <TagLocationModal
-          initialLat={pendingLocation.lat}
-          initialLon={pendingLocation.lon}
-          onClose={() => setPendingLocation(null)}
-          onCreate={handleCreateLocation}
-        />
-      )}
+        {showIdentifyModal && (
+          <IdentifyByPhotoModal
+            onClose={() => setShowIdentifyModal(false)}
+            onOpenIdentity={(identity) => {
+              setShowIdentifyModal(false);
+              void openIdentity(identity);
+            }}
+            onRename={(id, displayName) =>
+              void handleRenameIdentity(id, displayName)
+            }
+          />
+        )}
 
-      {selectedPhotoId && (
-        <PhotoDetailPanel
-          photoId={selectedPhotoId}
-          onClose={() => setSelectedPhotoId(null)}
-          onFindSimilar={handleFindSimilar}
-        />
-      )}
+        {pendingLocation && (
+          <TagLocationModal
+            initialLat={pendingLocation.lat}
+            initialLon={pendingLocation.lon}
+            onClose={() => setPendingLocation(null)}
+            onCreate={handleCreateLocation}
+          />
+        )}
+
+        {selectedPhotoId && (
+          <PhotoDetailPanel
+            photoId={selectedPhotoId}
+            locations={locations}
+            onClose={() => setSelectedPhotoId(null)}
+            onFindSimilar={handleFindSimilar}
+          />
+        )}
+      </AnimatePresence>
     </main>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded px-3 py-1 ${
-        active
-          ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-          : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

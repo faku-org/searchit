@@ -172,6 +172,10 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
       }
 
       await runInferencePipeline(photo.id, photo.previewPath, FACE_THUMBNAIL_DIR);
+      await db
+        .update(photos)
+        .set({ processedAt: new Date() })
+        .where(eq(photos.id, photo.id));
       return await loadPhotoDetail(photo.id);
     },
     { params: t.Object({ id: t.String() }) },

@@ -1,6 +1,18 @@
 import { useState } from "react";
+import { AlertTriangle, MapPinPlus, X } from "lucide-react";
+import { motion } from "motion/react";
 import type { CreateLocationRequestBody } from "@searchit/shared";
 import { useTranslation } from "../lib/i18n";
+import {
+  fieldLabel,
+  iconButton,
+  inputClass,
+  modalBackdrop,
+  modalPanel,
+  primaryButton,
+  secondaryButton,
+  springTransition,
+} from "../lib/theme";
 
 interface TagLocationModalProps {
   initialLat?: number;
@@ -8,9 +20,6 @@ interface TagLocationModalProps {
   onClose: () => void;
   onCreate: (body: CreateLocationRequestBody) => Promise<void>;
 }
-
-const inputClass =
-  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
 
 export function TagLocationModal({
   initialLat,
@@ -49,24 +58,44 @@ export function TagLocationModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-6"
+    <motion.div
+      className={modalBackdrop}
       onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
-      <form
-        className="flex w-full max-w-sm flex-col gap-3 rounded-lg bg-white p-4 dark:bg-neutral-900"
+      <motion.form
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={springTransition}
+        className={`${modalPanel} max-w-sm`}
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
           void handleSubmit();
         }}
       >
-        <h2 className="text-sm font-semibold">{t("tagLocation.title")}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 font-serif text-lg font-semibold text-mist-100">
+            <MapPinPlus className="h-4 w-4 text-blue-400" />
+            {t("tagLocation.title")}
+          </h2>
+          <button type="button" onClick={onClose} className={iconButton}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="flex items-center gap-1.5 text-sm text-rose-400">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {error}
+          </p>
+        )}
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-          {t("tagLocation.name")}
+        <label className="flex flex-col gap-1">
+          <span className={fieldLabel}>{t("tagLocation.name")}</span>
           <input
             type="text"
             value={name}
@@ -78,8 +107,8 @@ export function TagLocationModal({
         </label>
 
         <div className="flex gap-2">
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-            {t("tagLocation.latitude")}
+          <label className="flex flex-1 flex-col gap-1">
+            <span className={fieldLabel}>{t("tagLocation.latitude")}</span>
             <input
               type="number"
               step="any"
@@ -88,8 +117,8 @@ export function TagLocationModal({
               className={inputClass}
             />
           </label>
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-            {t("tagLocation.longitude")}
+          <label className="flex flex-1 flex-col gap-1">
+            <span className={fieldLabel}>{t("tagLocation.longitude")}</span>
             <input
               type="number"
               step="any"
@@ -101,22 +130,14 @@ export function TagLocationModal({
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
-          >
+          <button type="button" onClick={onClose} className={secondaryButton}>
             {t("common.cancel")}
           </button>
-          <button
-            type="submit"
-            disabled={isBusy || !isValid}
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          >
+          <button type="submit" disabled={isBusy || !isValid} className={primaryButton}>
             {isBusy ? t("common.saving") : t("tagLocation.save")}
           </button>
         </div>
-      </form>
-    </div>
+      </motion.form>
+    </motion.div>
   );
 }

@@ -1,12 +1,11 @@
 import { watch } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-import { eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { events, photos } from "../db/schema";
+import { withWorkerSlot } from "./concurrency";
 import { readExif } from "./exif";
-import { generatePreview } from "./preview";
-import { runInferencePipeline } from "./pipeline";
+import { processPhotoRow } from "./reingest";
 
 const SUPPORTED_EXTENSIONS = new Set([
   ".jpg",
@@ -151,33 +150,17 @@ async function ingestFile(
 
   if (!photo) return;
 
-  try {
-    const preview = await generatePreview(fullPath, previewDir, photo.id);
-    await db
-      .update(photos)
-      .set({
-        previewPath: preview.previewPath,
-        width: exif.width ?? preview.width,
-        height: exif.height ?? preview.height,
-      })
-      .where(eq(photos.id, photo.id));
-
-    await runInferencePipeline(photo.id, preview.previewPath, faceThumbnailDir);
-
-    await db
-      .update(photos)
-      .set({ status: "processed" })
-      .where(eq(photos.id, photo.id));
-  } catch (error) {
-    await db
-      .update(photos)
-      .set({
-        status: "failed",
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
-      .where(eq(photos.id, photo.id));
-    throw error;
-  }
+  await withWorkerSlot(() =>
+    processPhotoRow({
+      photoId: photo.id,
+      originalPath: fullPath,
+      previewPath: null,
+      previewDir,
+      faceThumbnailDir,
+      exifWidth: exif.width,
+      exifHeight: exif.height,
+    }),
+  );
 }
 
 async function ensureEvent(slug: string) {

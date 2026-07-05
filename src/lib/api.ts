@@ -4,12 +4,15 @@ import type {
   ConfigResponseBody,
   CreateEventRequestBody,
   CreateLocationRequestBody,
+  DeveloperStatsResponseBody,
   EventSummary,
+  FailedPhotoSummary,
   IdentitySummary,
   LocationSummary,
   MatchFaceResponseBody,
   PhotoDetail,
   PhotoSummary,
+  RetryPhotoResponseBody,
   SearchFilters,
   SelectRegionAction,
   SelectRegionResponseBody,
@@ -151,4 +154,16 @@ export function selectRegion(
 
 export function backfillPhotos(): Promise<BackfillResponseBody> {
   return apiJsonRequest("POST", "/photos/backfill");
+}
+
+export function getDeveloperStats(): Promise<DeveloperStatsResponseBody> {
+  return apiFetch<DeveloperStatsResponseBody>("/developer/stats");
+}
+
+export function getFailedPhotos(): Promise<FailedPhotoSummary[]> {
+  return apiFetch<FailedPhotoSummary[]>("/developer/failed-photos");
+}
+
+export function retryFailedPhoto(id: string): Promise<RetryPhotoResponseBody> {
+  return apiJsonRequest("POST", `/developer/failed-photos/${id}/retry`);
 }

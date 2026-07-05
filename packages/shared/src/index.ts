@@ -156,3 +156,31 @@ export interface FaceMatchCandidate {
 export interface MatchFaceResponseBody {
   candidates: FaceMatchCandidate[];
 }
+
+export interface DeveloperStatsResponseBody {
+  /** Photos with status "processed". */
+  currentlyIndexed: number;
+  /** Pending photos not currently occupying a worker slot. */
+  queue: number;
+  /** Pending photos currently being processed (bounded by `workers`). */
+  processing: number;
+  /** Photos that finished processing in the last 10 minutes. */
+  indexedLastTenMinutes: number;
+  /** Max photos the ingest pipeline processes concurrently. */
+  workers: number;
+  inferenceStatus: "ready" | "down";
+  inferencePort: number | null;
+  serverStatus: "nominal";
+  serverPort: number;
+}
+
+export interface FailedPhotoSummary {
+  id: string;
+  filename: string;
+  errorMessage: string | null;
+}
+
+export interface RetryPhotoResponseBody {
+  id: string;
+  status: PhotoStatus;
+}

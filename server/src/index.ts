@@ -5,6 +5,7 @@ import { Elysia } from "elysia";
 import { runMigrations } from "./db/client";
 import { checkInferenceHealth } from "./inference/client";
 import { startWatcher } from "./ingest/watcher";
+import { developerRoutes } from "./routes/developer";
 import { eventsRoutes } from "./routes/events";
 import { facesRoutes } from "./routes/faces";
 import { identitiesRoutes } from "./routes/identities";
@@ -56,6 +57,7 @@ const app = new Elysia()
   .use(identitiesRoutes)
   .use(facesRoutes)
   .use(locationsRoutes)
+  .use(developerRoutes)
   .listen({ port: PORT, hostname: HOST });
 
 console.log(`SearchIt server listening on http://${HOST}:${PORT}`);

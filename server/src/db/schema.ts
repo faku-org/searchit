@@ -64,6 +64,10 @@ export const photos = pgTable(
     height: integer("height"),
     status: photoStatusEnum("status").notNull().default("pending"),
     errorMessage: text("error_message"),
+    // Set when status transitions to "processed" -- distinct from createdAt
+    // (row-insert time) so the Developer tab's "indexed in the last N
+    // minutes" stat reflects actual completion time, not queue time.
+    processedAt: timestamp("processed_at", { withTimezone: true }),
     recognizedText: text("recognized_text"),
     // Manually-assigned identifier (replaces the old auto-detected bib
     // number) -- not unique, since several photos of the same person/id are
