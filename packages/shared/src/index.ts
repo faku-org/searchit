@@ -210,6 +210,8 @@ export interface DeveloperStatsResponseBody {
   inferencePort: number | null;
   serverStatus: "nominal";
   serverPort: number;
+  /** Photos with status "failed". */
+  failedCount: number;
 }
 
 export interface FailedPhotoSummary {

@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Aperture,
   ArrowLeft,
   CalendarPlus,
   FolderOpen,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type {
+  DeveloperStatsResponseBody,
   EventSummary,
   IdentitySummary,
   LocationSummary,
@@ -26,6 +26,7 @@ import "./App.css";
 import { DeveloperPanel } from "./components/DeveloperPanel";
 import { HomeView } from "./components/HomeView";
 import { IdentifyByPhotoModal } from "./components/IdentifyByPhotoModal";
+import { ImportPhotosModal } from "./components/ImportPhotosModal";
 import { MapView } from "./components/MapView";
 import { NewEventModal } from "./components/NewEventModal";
 import { PeopleGrid } from "./components/PeopleGrid";
@@ -40,11 +41,13 @@ import {
   createEvent,
   createLocation,
   getConfig,
+  getDeveloperStats,
   getEvents,
   getIdentities,
   getIdentityPhotos,
   getLocations,
   renameIdentity,
+  retryAllFailedPhotos,
   searchPhotos,
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
@@ -58,6 +61,11 @@ const POLL_INTERVAL_MS = 5000;
 interface SimilarityQuery {
   sourcePhotoId: string;
   results: PhotoSummary[];
+}
+
+interface ImportPrompt {
+  eventName: string;
+  folderPath: string;
 }
 
 interface PendingLocation {
@@ -87,6 +95,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [showNewEventModal, setShowNewEventModal] = useState(false);
+  const [importPrompt, setImportPrompt] = useState<ImportPrompt | null>(null);
   const [showIdentifyModal, setShowIdentifyModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isTaggingLocation, setIsTaggingLocation] = useState(false);
@@ -180,6 +189,59 @@ function App() {
     return () => clearInterval(id);
   }, [filters, similarityQuery]);
 
+  // Photos fail with a generic error when the inference sidecar is
+  // unreachable, which looks like a bug to a photographer who never opens the
+  // Developer tab. Poll for that specific condition regardless of which tab
+  // is open, explain it in plain language, and retry those photos as soon as
+  // inference responds again instead of leaving them stuck until someone
+  // notices and clicks "Retry all" manually.
+  const inferenceWasDownRef = useRef(false);
+
+  useEffect(() => {
+    if (!isBackendUrlResolved) return;
+
+    async function checkInferenceRecovery() {
+      let stats: DeveloperStatsResponseBody;
+      try {
+        stats = await getDeveloperStats();
+      } catch {
+        return;
+      }
+
+      if (stats.inferenceStatus === "down" && stats.failedCount > 0) {
+        if (!inferenceWasDownRef.current) {
+          inferenceWasDownRef.current = true;
+          showToast(t("developer.inferenceDownToast"), "error");
+        }
+        return;
+      }
+
+      if (stats.inferenceStatus === "ready" && inferenceWasDownRef.current) {
+        inferenceWasDownRef.current = false;
+        try {
+          const result = await retryAllFailedPhotos();
+          if (result.attempted > 0) {
+            showToast(
+              t(
+                result.attempted === 1
+                  ? "developer.inferenceRecoveredToastOne"
+                  : "developer.inferenceRecoveredToastOther",
+                { count: result.attempted },
+              ),
+              "success",
+            );
+          }
+        } catch {
+          // The Developer tab's manual "Retry all" button is still available.
+        }
+      }
+    }
+
+    void checkInferenceRecovery();
+    const id = setInterval(() => void checkInferenceRecovery(), POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isBackendUrlResolved]);
+
   // Photos keep arriving in the background while the app is open, so refresh
   // the roster each time the tab is opened rather than only once on mount,
   // then keep polling while the tab stays open.
@@ -198,12 +260,12 @@ function App() {
       });
   }
 
-  async function runSearch(options?: { silent?: boolean }) {
+  async function runSearch(options?: { silent?: boolean; filters?: SearchFilters }) {
     if (!options?.silent) {
       setIsLoading(true);
     }
     try {
-      const results = await searchPhotos(filters);
+      const results = await searchPhotos(options?.filters ?? filters);
       setPhotos(results);
     } catch (err) {
       if (!options?.silent) {
@@ -242,8 +304,18 @@ function App() {
   }
 
   async function handleCreateEvent(body: Parameters<typeof createEvent>[0]) {
-    await createEvent(body);
+    const created = await createEvent(body);
     refreshEvents();
+
+    // Jump straight to the new (empty) event instead of leaving the user on
+    // whatever filter they had before -- there's nothing to see there yet.
+    const nextFilters = { ...filters, eventId: created.id };
+    setFilters(nextFilters);
+    setSimilarityQuery(null);
+    setTab("photos");
+    void runSearch({ filters: nextFilters });
+
+    setImportPrompt({ eventName: created.name, folderPath: created.folderPath });
   }
 
   async function handleCreateLocation(
@@ -295,12 +367,8 @@ function App() {
   return (
     <main className="flex h-screen flex-col bg-navy-950 font-sans text-mist-100">
       <TitleBar />
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-800 px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-4">
-          <h1 className="flex items-center gap-1.5 font-serif text-lg font-semibold text-mist-100">
-            <Aperture className="h-5 w-5 text-blue-500" />
-            SearchIt
-          </h1>
           <nav className="relative flex items-center gap-1 rounded-full border border-navy-800 bg-navy-900/60 p-1 text-sm">
             {TABS.filter((tabDef) => tabDef.key !== "people" || faceRecognitionEnabled).map(
               ({ key, labelKey, icon: Icon }) => {
@@ -492,6 +560,14 @@ function App() {
           <NewEventModal
             onClose={() => setShowNewEventModal(false)}
             onCreate={handleCreateEvent}
+          />
+        )}
+
+        {importPrompt && (
+          <ImportPhotosModal
+            eventName={importPrompt.eventName}
+            folderPath={importPrompt.folderPath}
+            onClose={() => setImportPrompt(null)}
           />
         )}
 

@@ -51,7 +51,7 @@ export function SearchFiltersPanel({
 
   return (
     <form
-      className="flex flex-wrap items-end gap-3 border-b border-navy-800 bg-navy-900/40 p-4"
+      className="flex flex-wrap items-end gap-3 border border-navy-800 bg-navy-900/40 p-4 m-4 rounded-4xl"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();

@@ -45,12 +45,13 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
   .get("/stats", async (): Promise<DeveloperStatsResponseBody> => {
     const tenMinutesAgo = new Date(Date.now() - TEN_MINUTES_MS);
 
-    const [processedCount, recentlyIndexedCount, inferenceOk] =
+    const [processedCount, recentlyIndexedCount, failedCount, inferenceOk] =
       await Promise.all([
         countPhotos(eq(photos.status, "processed")),
         countPhotos(
           and(eq(photos.status, "processed"), gte(photos.processedAt, tenMinutesAgo)),
         ),
+        countPhotos(eq(photos.status, "failed")),
         checkInferenceHealth(),
       ]);
 
@@ -66,6 +67,7 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
       inferencePort: INFERENCE_PORT,
       serverStatus: "nominal",
       serverPort: SERVER_PORT,
+      failedCount,
     };
   })
   .get("/failed-photos", async (): Promise<FailedPhotoSummary[]> => {

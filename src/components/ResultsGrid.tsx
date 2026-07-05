@@ -93,7 +93,7 @@ export function ResultsGrid({ photos, onSelect }: ResultsGridProps) {
     <div className="flex-1 overflow-y-auto p-4">
       {groups.map((group) => (
         <section key={group.key} className="mb-6 last:mb-0">
-          <h3 className="sticky top-0 z-10 -mx-4 mb-2 bg-navy-950/95 px-4 py-1.5 text-xs font-semibold text-mist-500 backdrop-blur-sm">
+          <h3 className="sticky top-0 z-10 mb-2 block w-fit mx-auto rounded-2xl border border-navy-700/40 bg-navy-950/60 backdrop-blur-3xl px-4 py-1.5 text-xs font-semibold text-mist-500">
             {group.label}
           </h3>
           <motion.div
@@ -145,7 +145,7 @@ function PhotoCard({
         loading="lazy"
         className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
       />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-navy-950/95 via-navy-950/40 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-linear-to-t from-navy-950/95 via-navy-950/40 to-transparent" />
 
       {photo.status === "pending" && (
         <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-semibold text-navy-950">

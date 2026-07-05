@@ -28,7 +28,7 @@ export function PeopleGrid({ identities, onSelect, onRename }: PeopleGridProps) 
       variants={staggerContainer}
       initial="hidden"
       animate="show"
-      className="grid flex-1 content-start grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 overflow-y-auto p-8"
+      className="grid flex-1 mb-5 -mt-5 content-start grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3 overflow-y-auto p-8"
     >
       {identities.map((identity) => (
         <IdentityCard
@@ -58,7 +58,7 @@ function IdentityCard({
     <motion.div
       variants={staggerItem}
       whileHover={{ y: -4 }}
-      className="group relative flex aspect-4/5 flex-col overflow-hidden rounded-2xl border border-navy-800 bg-navy-900"
+      className="group relative flex aspect-4/5 mt-20 mb-35 flex-col overflow-hidden rounded-2xl border border-navy-800 bg-navy-900"
     >
       <button type="button" onClick={onSelect} className="absolute inset-0">
         {identity.thumbnailUrl ? (

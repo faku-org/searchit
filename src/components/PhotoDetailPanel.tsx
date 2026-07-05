@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Camera,
-  Check,
   FolderOpen,
-  Hash,
   MapPin,
   RotateCw,
   ScanText,
@@ -24,7 +22,6 @@ import {
   reprocessPhoto,
   resolveApiUrl,
   selectRegion,
-  setPhotoCustomId,
   splitFace,
 } from "../lib/api";
 import { findNearestLocation } from "../lib/geo";
@@ -71,14 +68,10 @@ export function PhotoDetailPanel({
   const [detail, setDetail] = useState<PhotoDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [customIdInput, setCustomIdInput] = useState("");
 
   function loadDetail() {
     getPhotoDetail(photoId)
-      .then((loaded) => {
-        setDetail(loaded);
-        setCustomIdInput(loaded.customId ?? "");
-      })
+      .then(setDetail)
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : String(err)),
       );
@@ -98,19 +91,6 @@ export function PhotoDetailPanel({
     const id = setInterval(loadDetail, PENDING_POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [photoId, detail?.status]);
-
-  async function handleSaveCustomId() {
-    if (!detail) return;
-    setIsBusy(true);
-    setError(null);
-    try {
-      setDetail(await setPhotoCustomId(detail.id, customIdInput || null));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsBusy(false);
-    }
-  }
 
   async function handleSplit(faceId: string) {
     try {
@@ -177,14 +157,14 @@ export function PhotoDetailPanel({
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={springTransition}
         onClick={(event) => event.stopPropagation()}
-        className={`relative flex max-h-full w-full flex-col overflow-y-auto rounded-2xl border border-navy-800 bg-navy-900 p-6 ${
+        className={`relative flex max-h-full w-full flex-col overflow-y-auto rounded-4xl border border-navy-800 bg-navy-900 p-6 ${
           isPortrait ? "max-w-4xl" : "max-w-3xl"
         }`}
       >
         <button
           type="button"
           onClick={onClose}
-          className={`${iconButton} absolute right-4 top-4 z-10 bg-navy-950/70`}
+          className={`${iconButton} absolute right-4 top-4 z-10 bg-navy-950/70 backdrop-blur-2xl`}
         >
           <X className="h-4 w-4" />
         </button>
@@ -236,26 +216,6 @@ export function PhotoDetailPanel({
                       {detail.takenAt
                         ? new Date(detail.takenAt).toLocaleString()
                         : t("common.unknown")}
-                    </span>
-                    <span className="flex items-center gap-1 rounded-full border border-navy-700 bg-navy-800 px-2 py-0.5 text-xs">
-                      <Hash className="h-3 w-3" />
-                      <input
-                        type="text"
-                        value={customIdInput}
-                        onChange={(event) => setCustomIdInput(event.target.value)}
-                        placeholder={t("photoDetail.idPlaceholder")}
-                        className="w-16 bg-transparent text-mist-100 outline-none"
-                      />
-                      {customIdInput !== (detail.customId ?? "") && (
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => void handleSaveCustomId()}
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          <Check className="h-3 w-3" />
-                        </button>
-                      )}
                     </span>
                   </div>
                 </div>
