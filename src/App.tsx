@@ -1,19 +1,16 @@
 import { useEffect, useState } from "react";
 import {
-  AlertTriangle,
   Aperture,
   ArrowLeft,
   CalendarPlus,
-  DownloadCloud,
   FolderOpen,
-  Globe,
   House,
   Images,
   Map as MapIcon,
   MapPinPlus,
   RefreshCw,
   ScanFace,
-  Server,
+  Settings as SettingsIcon,
   Terminal,
   Users,
 } from "lucide-react";
@@ -37,6 +34,7 @@ import { ResultsGrid } from "./components/ResultsGrid";
 import { SearchFiltersPanel } from "./components/SearchFiltersPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { TagLocationModal } from "./components/TagLocationModal";
+import { TitleBar } from "./components/TitleBar";
 import {
   backfillPhotos,
   createEvent,
@@ -50,18 +48,10 @@ import {
   searchPhotos,
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
-import { getApiBaseUrl, setApiBaseUrl } from "./lib/settings";
-import {
-  getBackendUrl,
-  pickWatchFolder,
-  setWatchDir as setServerWatchDir,
-} from "./lib/tauri";
-import { iconButton, pill, primaryButton } from "./lib/theme";
-import {
-  checkForUpdate,
-  installPendingUpdate,
-  type UpdateInfo,
-} from "./lib/updater";
+import { setApiBaseUrl } from "./lib/settings";
+import { getBackendUrl } from "./lib/tauri";
+import { iconButton, pill } from "./lib/theme";
+import { useToast } from "./lib/toast";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -86,16 +76,15 @@ const TABS: { key: Tab; labelKey: "nav.home" | "nav.photos" | "nav.people" | "na
 ];
 
 function App() {
-  const { t, locale, setLocale } = useTranslation();
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const [tab, setTab] = useState<Tab>("home");
-  const [apiBaseUrlInput, setApiBaseUrlInput] = useState(getApiBaseUrl());
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [locations, setLocations] = useState<LocationSummary[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [photos, setPhotos] = useState<PhotoSummary[]>([]);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [showIdentifyModal, setShowIdentifyModal] = useState(false);
@@ -114,13 +103,7 @@ function App() {
 
   const [similarityQuery, setSimilarityQuery] =
     useState<SimilarityQuery | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(
-    null,
-  );
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const [isBackendUrlResolved, setIsBackendUrlResolved] = useState(false);
 
   function refreshEvents(options?: { silent?: boolean }) {
@@ -150,7 +133,6 @@ function App() {
       .then((url) => {
         if (cancelled) return;
         setApiBaseUrl(url);
-        setApiBaseUrlInput(url);
       })
       .catch(() => {})
       .finally(() => {
@@ -219,15 +201,13 @@ function App() {
   async function runSearch(options?: { silent?: boolean }) {
     if (!options?.silent) {
       setIsLoading(true);
-      setError(null);
     }
     try {
       const results = await searchPhotos(filters);
       setPhotos(results);
-      if (!options?.silent) setError(null);
     } catch (err) {
       if (!options?.silent) {
-        setError(err instanceof Error ? err.message : String(err));
+        showToast(err instanceof Error ? err.message : String(err), "error");
       }
     } finally {
       if (!options?.silent) setIsLoading(false);
@@ -236,11 +216,10 @@ function App() {
 
   async function openIdentity(identity: IdentitySummary) {
     setSelectedIdentity(identity);
-    setError(null);
     try {
       setIdentityPhotos(await getIdentityPhotos(identity.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     }
   }
 
@@ -252,7 +231,7 @@ function App() {
       await renameIdentity(id, displayName);
       refreshIdentities();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     }
   }
 
@@ -281,11 +260,9 @@ function App() {
   }
 
   async function handleBackfill() {
-    setError(null);
-    setStatusMessage(null);
     try {
       const { queued } = await backfillPhotos();
-      setStatusMessage(
+      showToast(
         queued > 0
           ? t(queued === 1 ? "backfill.queuedOne" : "backfill.queuedOther", {
               count: queued,
@@ -293,45 +270,7 @@ function App() {
           : t("backfill.nothing"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function handleCheckForUpdate() {
-    setIsCheckingUpdate(true);
-    setError(null);
-    setStatusMessage(null);
-    try {
-      const update = await checkForUpdate();
-      setAvailableUpdate(update);
-      if (!update) setStatusMessage(t("update.upToDate"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsCheckingUpdate(false);
-    }
-  }
-
-  async function handleInstallUpdate() {
-    setIsInstallingUpdate(true);
-    setError(null);
-    try {
-      await installPendingUpdate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setIsInstallingUpdate(false);
-    }
-  }
-
-  async function handleChangeWatchDir() {
-    const picked = await pickWatchFolder();
-    if (!picked) return;
-    setError(null);
-    try {
-      await setServerWatchDir(picked);
-      setWatchDir(picked);
-    } catch {
-      setError(t("header.changeWatchDirError"));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     }
   }
 
@@ -355,6 +294,7 @@ function App() {
 
   return (
     <main className="flex h-screen flex-col bg-navy-950 font-sans text-mist-100">
+      <TitleBar />
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-800 px-4 py-3">
         <div className="flex items-center gap-4">
           <h1 className="flex items-center gap-1.5 font-serif text-lg font-semibold text-mist-100">
@@ -429,39 +369,12 @@ function App() {
           </button>
           <button
             type="button"
-            disabled={isCheckingUpdate}
-            onClick={() => void handleCheckForUpdate()}
-            className={pill}
-          >
-            <DownloadCloud className="h-3.5 w-3.5" />
-            {isCheckingUpdate ? t("update.checking") : t("update.check")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setLocale(locale === "en" ? "es" : "en")}
-            title="Language / Idioma"
-            className={pill}
-          >
-            <Globe className="h-3.5 w-3.5" />
-            {locale === "en" ? "ES" : "EN"}
-          </button>
-          <button
-            type="button"
             onClick={() => setShowSettingsModal(true)}
             className={pill}
           >
+            <SettingsIcon className="h-3.5 w-3.5" />
             {t("header.settings")}
           </button>
-          <label className="flex items-center gap-1.5 rounded-full border border-navy-700 bg-navy-800/80 px-3 py-1.5 text-xs text-mist-300">
-            <Server className="h-3.5 w-3.5 shrink-0" />
-            <input
-              type="text"
-              value={apiBaseUrlInput}
-              onChange={(event) => setApiBaseUrlInput(event.target.value)}
-              onBlur={() => setApiBaseUrl(apiBaseUrlInput)}
-              className="w-40 bg-transparent text-mist-100 outline-none"
-            />
-          </label>
         </div>
       </header>
 
@@ -471,39 +384,7 @@ function App() {
           <span className="truncate">
             {t("header.watchDir", { path: watchDir })}
           </span>
-          <button
-            type="button"
-            onClick={() => void handleChangeWatchDir()}
-            className="shrink-0 rounded-full border border-navy-700 px-2 py-0.5 hover:bg-navy-800"
-          >
-            {t("header.changeWatchDir")}
-          </button>
         </p>
-      )}
-
-      {error && (
-        <p className="flex items-center gap-2 px-4 py-2 text-sm text-rose-400">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          {error}
-        </p>
-      )}
-      {statusMessage && (
-        <p className="px-4 py-2 text-sm text-mist-500">{statusMessage}</p>
-      )}
-      {availableUpdate && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm text-mist-300">
-          <span>
-            {t("update.available", { version: availableUpdate.version })}
-          </span>
-          <button
-            type="button"
-            disabled={isInstallingUpdate}
-            onClick={() => void handleInstallUpdate()}
-            className={primaryButton}
-          >
-            {isInstallingUpdate ? t("update.installing") : t("update.install")}
-          </button>
-        </div>
       )}
 
       {tab === "home" && (
@@ -595,18 +476,18 @@ function App() {
         <DeveloperPanel onSelectPhoto={(photoId) => setSelectedPhotoId(photoId)} />
       )}
 
-      {showSettingsModal && (
-        <SettingsModal
-          onClose={() => setShowSettingsModal(false)}
-          onSettingsChanged={(settings) => {
-            setWatchDir(settings.currentWatchDir);
-            setFaceRecognitionEnabled(settings.faceRecognitionEnabled);
-            setVisualSearchEnabled(settings.visualSearchEnabled);
-          }}
-        />
-      )}
-
       <AnimatePresence>
+        {showSettingsModal && (
+          <SettingsModal
+            onClose={() => setShowSettingsModal(false)}
+            onSettingsChanged={(settings) => {
+              setWatchDir(settings.currentWatchDir);
+              setFaceRecognitionEnabled(settings.faceRecognitionEnabled);
+              setVisualSearchEnabled(settings.visualSearchEnabled);
+            }}
+          />
+        )}
+
         {showNewEventModal && (
           <NewEventModal
             onClose={() => setShowNewEventModal(false)}

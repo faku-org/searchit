@@ -1,5 +1,15 @@
 import { useEffect, useState } from "react";
+import {
+  DownloadCloud,
+  FolderOpen,
+  Globe,
+  Server,
+  Settings as SettingsIcon,
+  X,
+} from "lucide-react";
+import { motion } from "motion/react";
 import { useTranslation } from "../lib/i18n";
+import { getApiBaseUrl, setApiBaseUrl } from "../lib/settings";
 import {
   getAppSettings,
   pickWatchFolder,
@@ -10,6 +20,17 @@ import {
   type AppSettings,
   type WatchDirMode,
 } from "../lib/tauri";
+import { useToast } from "../lib/toast";
+import { checkForUpdate, installPendingUpdate, type UpdateInfo } from "../lib/updater";
+import {
+  fieldLabel,
+  iconButton,
+  modalBackdrop,
+  modalPanel,
+  primaryButton,
+  secondaryButton,
+  springTransition,
+} from "../lib/theme";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -17,14 +38,18 @@ interface SettingsModalProps {
   onSettingsChanged: (settings: AppSettings) => void;
 }
 
-export function SettingsModal({
-  onClose,
-  onSettingsChanged,
-}: SettingsModalProps) {
-  const { t } = useTranslation();
+export function SettingsModal({ onClose, onSettingsChanged }: SettingsModalProps) {
+  const { t, locale, setLocale } = useTranslation();
+  const { showToast } = useToast();
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [apiBaseUrlInput, setApiBaseUrlInput] = useState(getApiBaseUrl());
   const [isBusy, setIsBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isChangingFolder, setIsChangingFolder] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(
+    null,
+  );
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
   function loadSettings() {
     getAppSettings()
@@ -32,7 +57,7 @@ export function SettingsModal({
         setSettings(loaded);
         onSettingsChanged(loaded);
       })
-      .catch(() => setError(t("settings.loadError")));
+      .catch(() => showToast(t("settings.loadError"), "error"));
   }
 
   // Loaded once on mount; subsequent refreshes are triggered explicitly after
@@ -43,12 +68,11 @@ export function SettingsModal({
 
   async function handleModeChange(mode: WatchDirMode) {
     setIsBusy(true);
-    setError(null);
     try {
       await setWatchDirMode(mode);
       loadSettings();
     } catch {
-      setError(t("settings.loadError"));
+      showToast(t("settings.loadError"), "error");
     } finally {
       setIsBusy(false);
     }
@@ -57,26 +81,24 @@ export function SettingsModal({
   async function handleChangeFolder() {
     const picked = await pickWatchFolder();
     if (!picked) return;
-    setIsBusy(true);
-    setError(null);
+    setIsChangingFolder(true);
     try {
       await setWatchDir(picked);
       loadSettings();
     } catch {
-      setError(t("header.changeWatchDirError"));
+      showToast(t("header.changeWatchDirError"), "error");
     } finally {
-      setIsBusy(false);
+      setIsChangingFolder(false);
     }
   }
 
   async function handleFaceRecognitionChange(enabled: boolean) {
     setIsBusy(true);
-    setError(null);
     try {
       await setFaceRecognitionEnabled(enabled);
       loadSettings();
     } catch {
-      setError(t("settings.loadError"));
+      showToast(t("settings.loadError"), "error");
     } finally {
       setIsBusy(false);
     }
@@ -84,123 +106,201 @@ export function SettingsModal({
 
   async function handleVisualSearchChange(enabled: boolean) {
     setIsBusy(true);
-    setError(null);
     try {
       await setVisualSearchEnabled(enabled);
       loadSettings();
     } catch {
-      setError(t("settings.loadError"));
+      showToast(t("settings.loadError"), "error");
     } finally {
       setIsBusy(false);
     }
   }
 
+  async function handleCheckForUpdate() {
+    setIsCheckingUpdate(true);
+    try {
+      const update = await checkForUpdate();
+      setAvailableUpdate(update);
+      if (!update) showToast(t("update.upToDate"));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err), "error");
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }
+
+  async function handleInstallUpdate() {
+    setIsInstallingUpdate(true);
+    try {
+      await installPendingUpdate();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err), "error");
+      setIsInstallingUpdate(false);
+    }
+  }
+
   return (
-    <div
-      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-6"
+    <motion.div
+      className={modalBackdrop}
       onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
-      <div
-        className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-white p-4 dark:bg-neutral-900"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={springTransition}
+        className={`${modalPanel} max-w-md`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{t("settings.title")}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-          >
-            {t("common.close")}
+          <h2 className="flex items-center gap-2 font-serif text-lg font-semibold text-mist-100">
+            <SettingsIcon className="h-4 w-4 text-blue-400" />
+            {t("settings.title")}
+          </h2>
+          <button type="button" onClick={onClose} className={iconButton}>
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">
+          <span className={fieldLabel}>{t("settings.language")}</span>
+          <button
+            type="button"
+            onClick={() => setLocale(locale === "en" ? "es" : "en")}
+            className={`${secondaryButton} self-start`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            {locale === "en" ? "English" : "Español"}
+          </button>
+        </div>
 
-        {settings && (
-          <>
-            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
-              {t("settings.currentFolder", { path: settings.currentWatchDir })}
+        <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">
+          <span className={fieldLabel}>{t("settings.server")}</span>
+          <label className="flex items-center gap-2 rounded-full border border-navy-700 bg-navy-800 px-3.5 py-1.5">
+            <Server className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+            <input
+              type="text"
+              value={apiBaseUrlInput}
+              onChange={(event) => setApiBaseUrlInput(event.target.value)}
+              onBlur={() => setApiBaseUrl(apiBaseUrlInput)}
+              className="w-full bg-transparent text-sm text-mist-100 outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">
+          <span className={fieldLabel}>{t("settings.watchDir")}</span>
+          {settings && (
+            <p className="flex items-center gap-2 truncate text-xs text-mist-400">
+              <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{settings.currentWatchDir}</span>
             </p>
-
-            <fieldset className="flex flex-col gap-2 text-sm">
-              <legend className="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                {t("settings.watchDirMode")}
-              </legend>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="watchDirMode"
-                  checked={settings.mode === "pictures"}
-                  disabled={isBusy}
-                  onChange={() => void handleModeChange("pictures")}
-                />
-                {t("settings.modePictures")}
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="watchDirMode"
-                  checked={settings.mode === "last"}
-                  disabled={isBusy}
-                  onChange={() => void handleModeChange("last")}
-                />
-                {t("settings.modeLast")}
-              </label>
-            </fieldset>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
+          )}
+          <div className="flex flex-col gap-1.5 text-sm text-mist-300">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="watchDirMode"
+                checked={settings?.mode === "pictures"}
                 disabled={isBusy}
-                onClick={() => void handleChangeFolder()}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
-              >
-                {t("settings.changeFolder")}
-              </button>
-              <button
-                type="button"
+                onChange={() => void handleModeChange("pictures")}
+              />
+              {t("settings.modePictures")}
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="watchDirMode"
+                checked={settings?.mode === "last"}
                 disabled={isBusy}
-                onClick={() => void handleModeChange("pictures")}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
-              >
-                {t("settings.resetToPictures")}
-              </button>
-            </div>
+                onChange={() => void handleModeChange("last")}
+              />
+              {t("settings.modeLast")}
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isChangingFolder}
+              onClick={() => void handleChangeFolder()}
+              className={secondaryButton}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              {t("settings.changeFolder")}
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleModeChange("pictures")}
+              className={secondaryButton}
+            >
+              {t("settings.resetToPictures")}
+            </button>
+          </div>
+        </div>
 
-            <fieldset className="flex flex-col gap-2 border-t border-neutral-200 pt-3 text-sm dark:border-neutral-800">
-              <legend className="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                {t("settings.capabilities")}
-              </legend>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.faceRecognitionEnabled}
-                  disabled={isBusy}
-                  onChange={(event) =>
-                    void handleFaceRecognitionChange(event.target.checked)
-                  }
-                />
-                {t("settings.faceRecognition")}
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.visualSearchEnabled}
-                  disabled={isBusy}
-                  onChange={(event) =>
-                    void handleVisualSearchChange(event.target.checked)
-                  }
-                />
-                {t("settings.visualSearch")}
-              </label>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {t("settings.capabilitiesHint")}
-              </p>
-            </fieldset>
-          </>
-        )}
-      </div>
-    </div>
+        <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">
+          <span className={fieldLabel}>{t("settings.capabilities")}</span>
+          <label className="flex items-center gap-2 text-sm text-mist-300">
+            <input
+              type="checkbox"
+              checked={settings?.faceRecognitionEnabled ?? false}
+              disabled={isBusy}
+              onChange={(event) =>
+                void handleFaceRecognitionChange(event.target.checked)
+              }
+            />
+            {t("settings.faceRecognition")}
+          </label>
+          <label className="flex items-center gap-2 text-sm text-mist-300">
+            <input
+              type="checkbox"
+              checked={settings?.visualSearchEnabled ?? false}
+              disabled={isBusy}
+              onChange={(event) =>
+                void handleVisualSearchChange(event.target.checked)
+              }
+            />
+            {t("settings.visualSearch")}
+          </label>
+          <p className="text-xs text-mist-500">{t("settings.capabilitiesHint")}</p>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">
+          <span className={fieldLabel}>{t("settings.updates")}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isCheckingUpdate}
+              onClick={() => void handleCheckForUpdate()}
+              className={secondaryButton}
+            >
+              <DownloadCloud className="h-3.5 w-3.5" />
+              {isCheckingUpdate ? t("update.checking") : t("update.check")}
+            </button>
+            {availableUpdate && (
+              <>
+                <span className="text-xs text-mist-400">
+                  {t("update.available", { version: availableUpdate.version })}
+                </span>
+                <button
+                  type="button"
+                  disabled={isInstallingUpdate}
+                  onClick={() => void handleInstallUpdate()}
+                  className={primaryButton}
+                >
+                  {isInstallingUpdate
+                    ? t("update.installing")
+                    : t("update.install")}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
