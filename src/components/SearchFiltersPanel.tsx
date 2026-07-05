@@ -2,13 +2,11 @@ import type { ReactNode } from "react";
 import {
   CalendarDays,
   ChevronDown,
-  Hash,
   type LucideIcon,
   MapPin,
   Radar,
   RefreshCw,
   Search,
-  Sparkles,
   TextSearch,
 } from "lucide-react";
 import type { EventSummary, LocationSummary, SearchFilters } from "@searchit/shared";
@@ -54,18 +52,6 @@ export function SearchFiltersPanel({
         onSubmit();
       }}
     >
-      <Field icon={Hash} label={t("filters.photoId")}>
-        <input
-          type="text"
-          value={filters.customId ?? ""}
-          onChange={(event) =>
-            update("customId", event.target.value || undefined)
-          }
-          placeholder={t("photoDetail.idPlaceholder")}
-          className={`${bareInputClass} w-24`}
-        />
-      </Field>
-
       <SelectField icon={CalendarDays} label={t("filters.event")}>
         <select
           value={filters.eventId ?? ""}
@@ -135,18 +121,6 @@ export function SearchFiltersPanel({
             )
           }
           className={`${bareInputClass} w-16`}
-        />
-      </Field>
-
-      <Field icon={Sparkles} label={t("filters.describe")}>
-        <input
-          type="text"
-          value={filters.visualQuery ?? ""}
-          onChange={(event) =>
-            update("visualQuery", event.target.value || undefined)
-          }
-          placeholder={t("filters.describePlaceholder")}
-          className={`${bareInputClass} w-40`}
         />
       </Field>
 
