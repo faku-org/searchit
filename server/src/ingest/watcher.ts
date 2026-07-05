@@ -153,6 +153,7 @@ async function ingestFile(
   await withWorkerSlot(() =>
     processPhotoRow({
       photoId: photo.id,
+      eventId: event.id,
       originalPath: fullPath,
       previewPath: null,
       previewDir,

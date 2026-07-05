@@ -11,20 +11,26 @@ if TYPE_CHECKING:
 _rapidocr_engine = None
 
 
-def read_scene_text(image: "Image") -> str:
+def read_scene_text(image: "Image", min_confidence: float | None = None) -> str:
     """Cross-platform OCR with no GPU and no multi-gigabyte model download:
     OS-native text recognition where the OS ships one for free (Apple Vision
     on macOS, Windows.Media.Ocr on Windows), else a small bundled ONNX OCR
     model (RapidOCR) that runs anywhere onnxruntime does. See ocr.py for the
     separate, higher-quality DeepSeek-OCR-2 tier used instead of this on an
     NVIDIA CUDA box with the `ml` extra installed.
+
+    min_confidence drops low-score per-line detections before joining them
+    into the returned text -- only honored on backends that actually expose a
+    per-detection score (RapidOCR, Apple Vision's topCandidates confidence).
+    Windows.Media.Ocr's public API has no per-word/line confidence at all, so
+    it's ignored there.
     """
     system = platform.system()
     if system == "Darwin":
-        return _read_with_apple_vision(image)
+        return _read_with_apple_vision(image, min_confidence)
     if system == "Windows":
         return _read_with_windows_ocr(image)
-    return _read_with_rapidocr(image)
+    return _read_with_rapidocr(image, min_confidence)
 
 
 def _read_with_windows_ocr(image: "Image") -> str:
@@ -58,7 +64,7 @@ def _read_with_windows_ocr(image: "Image") -> str:
     return asyncio.run(_recognize())
 
 
-def _read_with_apple_vision(image: "Image") -> str:
+def _read_with_apple_vision(image: "Image", min_confidence: float | None = None) -> str:
     # Untestable on this project's Windows dev machine -- written against
     # Apple's documented Vision APIs (VNRecognizeTextRequest /
     # VNImageRequestHandler) via pyobjc-framework-Vision/-Quartz. Re-verify
@@ -89,12 +95,16 @@ def _read_with_apple_vision(image: "Image") -> str:
     lines: list[str] = []
     for observation in request.results():
         candidates = observation.topCandidates_(1)
-        if candidates:
-            lines.append(str(candidates[0].string()))
+        if not candidates:
+            continue
+        candidate = candidates[0]
+        if min_confidence is not None and candidate.confidence() < min_confidence:
+            continue
+        lines.append(str(candidate.string()))
     return "\n".join(lines)
 
 
-def _read_with_rapidocr(image: "Image") -> str:
+def _read_with_rapidocr(image: "Image", min_confidence: float | None = None) -> str:
     global _rapidocr_engine
     import numpy as np
 
@@ -108,4 +118,8 @@ def _read_with_rapidocr(image: "Image") -> str:
 
     if result is None or not result.txts:
         return ""
-    return "\n".join(result.txts)
+    scores = getattr(result, "scores", None)
+    if min_confidence is None or not scores or len(scores) != len(result.txts):
+        return "\n".join(result.txts)
+    kept = [txt for txt, score in zip(result.txts, scores) if score >= min_confidence]
+    return "\n".join(kept)

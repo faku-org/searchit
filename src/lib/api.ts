@@ -18,6 +18,8 @@ import type {
   SearchFilters,
   SelectRegionAction,
   SelectRegionResponseBody,
+  UpdateEventRequestBody,
+  UpdateEventResponseBody,
 } from "@searchit/shared";
 import { getApiBaseUrl } from "./settings";
 
@@ -84,6 +86,13 @@ export function createEvent(
   body: CreateEventRequestBody,
 ): Promise<CreateEventResponseBody> {
   return apiJsonRequest("POST", "/events", body);
+}
+
+export function updateEvent(
+  id: string,
+  body: UpdateEventRequestBody,
+): Promise<UpdateEventResponseBody> {
+  return apiJsonRequest("PATCH", `/events/${id}`, body);
 }
 
 export function getLocations(): Promise<LocationSummary[]> {

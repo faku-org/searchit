@@ -171,7 +171,13 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
         return { error: "Photo has no preview yet, it may still be processing" };
       }
 
-      await runInferencePipeline(photo.id, photo.previewPath, FACE_THUMBNAIL_DIR);
+      await runInferencePipeline(
+        photo.id,
+        photo.eventId,
+        photo.originalPath,
+        photo.previewPath,
+        FACE_THUMBNAIL_DIR,
+      );
       await db
         .update(photos)
         .set({ processedAt: new Date() })
@@ -275,14 +281,23 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
     // goes through it), which is exactly the class of photo ingested before a
     // later phase (faces, CLIP) existed.
     const candidates = await db
-      .select({ id: photos.id, previewPath: photos.previewPath })
+      .select({
+        id: photos.id,
+        eventId: photos.eventId,
+        originalPath: photos.originalPath,
+        previewPath: photos.previewPath,
+      })
       .from(photos)
       .leftJoin(imageEmbeddings, eq(imageEmbeddings.photoId, photos.id))
       .where(and(eq(photos.status, "processed"), isNull(imageEmbeddings.id)));
 
     const reprocessable = candidates.filter(
-      (candidate): candidate is { id: string; previewPath: string } =>
-        candidate.previewPath !== null,
+      (candidate): candidate is {
+        id: string;
+        eventId: string;
+        originalPath: string;
+        previewPath: string;
+      } => candidate.previewPath !== null,
     );
 
     void (async () => {
@@ -290,6 +305,8 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
         try {
           await runInferencePipeline(
             candidate.id,
+            candidate.eventId,
+            candidate.originalPath,
             candidate.previewPath,
             FACE_THUMBNAIL_DIR,
           );

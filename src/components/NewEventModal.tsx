@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, CalendarPlus, X } from "lucide-react";
 import { motion } from "motion/react";
-import type { CreateEventRequestBody } from "@searchit/shared";
+import type { CreateEventRequestBody, EventCategory } from "@searchit/shared";
 import { useTranslation } from "../lib/i18n";
 import {
   fieldLabel,
@@ -13,6 +13,7 @@ import {
   secondaryButton,
   springTransition,
 } from "../lib/theme";
+import { WeightSlider } from "./WeightSlider";
 
 interface NewEventModalProps {
   onClose: () => void;
@@ -23,6 +24,9 @@ export function NewEventModal({ onClose, onCreate }: NewEventModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [startsAt, setStartsAt] = useState("");
+  const [category, setCategory] = useState<EventCategory>("general");
+  const [customOcrMinConfidence, setCustomOcrMinConfidence] = useState("0.5");
+  const [customFaceMatchMaxDistance, setCustomFaceMatchMaxDistance] = useState("0.6");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +35,17 @@ export function NewEventModal({ onClose, onCreate }: NewEventModalProps) {
     setIsBusy(true);
     setError(null);
     try {
-      await onCreate({ name: name.trim(), startsAt: startsAt || undefined });
+      await onCreate({
+        name: name.trim(),
+        startsAt: startsAt || undefined,
+        category,
+        ...(category === "custom"
+          ? {
+              customOcrMinConfidence: Number(customOcrMinConfidence),
+              customFaceMatchMaxDistance: Number(customFaceMatchMaxDistance),
+            }
+          : {}),
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -98,6 +112,44 @@ export function NewEventModal({ onClose, onCreate }: NewEventModalProps) {
             className={inputClass}
           />
         </label>
+
+        <label className="flex flex-col gap-1">
+          <span className={fieldLabel}>{t("newEvent.category")}</span>
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value as EventCategory)}
+            className={inputClass}
+          >
+            <option value="sports">{t("newEvent.categorySports")}</option>
+            <option value="vacation">{t("newEvent.categoryVacation")}</option>
+            <option value="general">{t("newEvent.categoryGeneral")}</option>
+            <option value="custom">{t("newEvent.categoryCustom")}</option>
+          </select>
+        </label>
+
+        {category === "custom" && (
+          <>
+            <WeightSlider
+              label={t("newEvent.customOcrConfidence")}
+              hint={t("newEvent.customOcrConfidenceHint")}
+              min={0}
+              max={1}
+              step={0.05}
+              value={customOcrMinConfidence}
+              onChange={setCustomOcrMinConfidence}
+            />
+
+            <WeightSlider
+              label={t("newEvent.customFaceMatchDistance")}
+              hint={t("newEvent.customFaceMatchDistanceHint")}
+              min={0}
+              max={2}
+              step={0.05}
+              value={customFaceMatchMaxDistance}
+              onChange={setCustomFaceMatchMaxDistance}
+            />
+          </>
+        )}
 
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className={secondaryButton}>

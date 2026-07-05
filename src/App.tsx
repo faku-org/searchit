@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ScanFace,
   Settings as SettingsIcon,
+  SlidersHorizontal,
   Terminal,
   Users,
 } from "lucide-react";
@@ -19,9 +20,11 @@ import type {
   LocationSummary,
   PhotoSummary,
   SearchFilters,
+  UpdateEventRequestBody,
 } from "@searchit/shared";
 import "./App.css";
 import { DeveloperPanel } from "./components/DeveloperPanel";
+import { EventsPanel } from "./components/EventsPanel";
 import { IdentifyByPhotoModal } from "./components/IdentifyByPhotoModal";
 import { ImportPhotosModal } from "./components/ImportPhotosModal";
 import { MapView } from "./components/MapView";
@@ -46,6 +49,7 @@ import {
   renameIdentity,
   retryAllFailedPhotos,
   searchPhotos,
+  updateEvent,
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
 import { setApiBaseUrl } from "./lib/settings";
@@ -70,12 +74,17 @@ interface PendingLocation {
   lon: number;
 }
 
-type Tab = "photos" | "people" | "map" | "developer";
+type Tab = "photos" | "people" | "map" | "events" | "developer";
 
-const TABS: { key: Tab; labelKey: "nav.photos" | "nav.people" | "nav.map" | "nav.developer"; icon: typeof Images }[] = [
+const TABS: {
+  key: Tab;
+  labelKey: "nav.photos" | "nav.people" | "nav.map" | "nav.events" | "nav.developer";
+  icon: typeof Images;
+}[] = [
   { key: "photos", labelKey: "nav.photos", icon: Images },
   { key: "people", labelKey: "nav.people", icon: Users },
   { key: "map", labelKey: "nav.map", icon: MapIcon },
+  { key: "events", labelKey: "nav.events", icon: SlidersHorizontal },
   { key: "developer", labelKey: "nav.developer", icon: Terminal },
 ];
 
@@ -301,6 +310,12 @@ function App() {
     setImportPrompt({ eventName: created.name, folderPath: created.folderPath });
   }
 
+  async function handleUpdateEvent(id: string, body: UpdateEventRequestBody) {
+    const result = await updateEvent(id, body);
+    refreshEvents();
+    return result;
+  }
+
   async function handleCreateLocation(
     body: Parameters<typeof createLocation>[0],
   ) {
@@ -331,6 +346,13 @@ function App() {
 
   return (
     <main className="flex h-screen flex-col bg-navy-950 font-sans text-mist-100">
+      <svg width="0" height="0" className="absolute" aria-hidden="true">
+        <defs>
+          <clipPath id="squircle-clip" clipPathUnits="objectBoundingBox">
+            <path d="M 1.0000 0.5000 L 0.9983 0.7214 L 0.9931 0.7912 L 0.9844 0.8405 L 0.9720 0.8789 L 0.9558 0.9100 L 0.9353 0.9353 L 0.9100 0.9558 L 0.8789 0.9720 L 0.8405 0.9844 L 0.7912 0.9931 L 0.7214 0.9983 L 0.5000 1.0000 L 0.2786 0.9983 L 0.2088 0.9931 L 0.1595 0.9844 L 0.1211 0.9720 L 0.0900 0.9558 L 0.0647 0.9353 L 0.0442 0.9100 L 0.0280 0.8789 L 0.0156 0.8405 L 0.0069 0.7912 L 0.0017 0.7214 L 0.0000 0.5000 L 0.0017 0.2786 L 0.0069 0.2088 L 0.0156 0.1595 L 0.0280 0.1211 L 0.0442 0.0900 L 0.0647 0.0647 L 0.0900 0.0442 L 0.1211 0.0280 L 0.1595 0.0156 L 0.2088 0.0069 L 0.2786 0.0017 L 0.5000 0.0000 L 0.7214 0.0017 L 0.7912 0.0069 L 0.8405 0.0156 L 0.8789 0.0280 L 0.9100 0.0442 L 0.9353 0.0647 L 0.9558 0.0900 L 0.9720 0.1211 L 0.9844 0.1595 L 0.9931 0.2088 L 0.9983 0.2786 L 1.0000 0.5000 Z" />
+          </clipPath>
+        </defs>
+      </svg>
       <TitleBar />
       <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-4">
@@ -483,6 +505,8 @@ function App() {
           onMapClick={handleMapClick}
         />
       )}
+
+      {tab === "events" && <EventsPanel events={events} onUpdate={handleUpdateEvent} />}
 
       {tab === "developer" && <DeveloperPanel />}
 

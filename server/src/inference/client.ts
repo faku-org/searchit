@@ -51,11 +51,12 @@ export function embedText(text: string): Promise<EmbedTextResponseBody> {
 
 export function readSceneText(
   imagePath: string,
+  minConfidence?: number,
 ): Promise<ReadSceneTextResponseBody> {
-  return postImagePath<ReadSceneTextResponseBody>(
-    "/read-scene-text",
+  return postJson<ReadSceneTextResponseBody>("/read-scene-text", {
     imagePath,
-  );
+    minConfidence,
+  });
 }
 
 export async function checkInferenceHealth(): Promise<boolean> {

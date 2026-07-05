@@ -13,6 +13,7 @@ import { runInferencePipeline } from "./pipeline";
  */
 export async function processPhotoRow(params: {
   photoId: string;
+  eventId: string;
   originalPath: string;
   previewPath: string | null;
   previewDir: string;
@@ -20,7 +21,7 @@ export async function processPhotoRow(params: {
   exifWidth: number | null;
   exifHeight: number | null;
 }): Promise<void> {
-  const { photoId, originalPath, previewDir, faceThumbnailDir, exifWidth, exifHeight } =
+  const { photoId, eventId, originalPath, previewDir, faceThumbnailDir, exifWidth, exifHeight } =
     params;
 
   try {
@@ -38,7 +39,7 @@ export async function processPhotoRow(params: {
         .where(eq(photos.id, photoId));
     }
 
-    await runInferencePipeline(photoId, previewPath, faceThumbnailDir);
+    await runInferencePipeline(photoId, eventId, originalPath, previewPath, faceThumbnailDir);
 
     await db
       .update(photos)

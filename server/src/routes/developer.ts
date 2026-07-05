@@ -118,6 +118,7 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
       await withWorkerSlot(() =>
         processPhotoRow({
           photoId: photo.id,
+          eventId: photo.eventId,
           originalPath: photo.originalPath,
           previewPath: photo.previewPath,
           previewDir: PREVIEW_DIR,
@@ -139,6 +140,7 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
     const rows = await db
       .select({
         id: photos.id,
+        eventId: photos.eventId,
         originalPath: photos.originalPath,
         previewPath: photos.previewPath,
         width: photos.width,
@@ -160,6 +162,7 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
           withWorkerSlot(() =>
             processPhotoRow({
               photoId: photo.id,
+              eventId: photo.eventId,
               originalPath: photo.originalPath,
               previewPath: photo.previewPath,
               previewDir: PREVIEW_DIR,

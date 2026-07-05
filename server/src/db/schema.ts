@@ -36,11 +36,21 @@ export interface Bbox {
   height: number;
 }
 
+export const eventCategoryEnum = pgEnum("event_category", [
+  "sports",
+  "vacation",
+  "general",
+  "custom",
+]);
+
 export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   startsAt: timestamp("starts_at", { withTimezone: true }),
+  category: eventCategoryEnum("category").notNull().default("general"),
+  customOcrMinConfidence: real("custom_ocr_min_confidence"),
+  customFaceMatchMaxDistance: real("custom_face_match_max_distance"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
