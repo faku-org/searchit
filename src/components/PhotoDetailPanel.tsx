@@ -206,9 +206,12 @@ export function PhotoDetailPanel({
                   : "grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2"
               }
             >
-              <div className="flex flex-col gap-3">
-                <div>
-                  <h2 className="font-serif text-2xl font-semibold text-mist-100">
+              <div className="flex min-w-0 flex-col gap-3">
+                <div className="min-w-0">
+                  <h2
+                    className="truncate pr-10 font-serif text-2xl font-semibold text-mist-100"
+                    title={detail.customId ? `#${detail.customId}` : detail.filename}
+                  >
                     {detail.customId ? `#${detail.customId}` : detail.filename}
                   </h2>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mist-500">
@@ -249,7 +252,7 @@ export function PhotoDetailPanel({
                           <img
                             src={resolveApiUrl(face.thumbnailUrl)}
                             alt={t("photoDetail.detectedFace")}
-                            className="h-14 w-14 rounded-full border border-navy-700 object-cover"
+                            className="squircle h-14 w-14 object-cover shadow-[inset_0_0_0_1px_var(--color-navy-700)]"
                           />
                           <button
                             type="button"

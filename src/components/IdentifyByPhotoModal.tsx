@@ -175,7 +175,7 @@ function CandidateRow({
         <img
           src={resolveApiUrl(candidate.thumbnailUrl)}
           alt={t("photoDetail.detectedFace")}
-          className="h-12 w-12 rounded-full object-cover"
+          className="squircle h-12 w-12 object-cover"
         />
       )}
       <div className="flex flex-1 flex-col gap-0.5">
