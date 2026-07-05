@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
+import { Images, Search } from "lucide-react";
+import { motion } from "motion/react";
 import type { EventSummary } from "@searchit/shared";
 import { useTranslation } from "../lib/i18n";
+import { inputClass, primaryButton, staggerContainer, staggerItem } from "../lib/theme";
 import { IngestProgress } from "./IngestProgress";
 
 interface HomeViewProps {
@@ -37,13 +40,10 @@ export function HomeView({
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("home.searchPlaceholder")}
           autoFocus
-          className="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+          className={`flex-1 ${inputClass}`}
         />
-        <button
-          type="submit"
-          disabled={!query.trim()}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-        >
+        <button type="submit" disabled={!query.trim()} className={primaryButton}>
+          <Search className="h-3.5 w-3.5" />
           {t("home.searchButton")}
         </button>
       </form>
@@ -51,35 +51,40 @@ export function HomeView({
       <button
         type="button"
         onClick={onAllPhotos}
-        className="flex flex-col items-start gap-1 rounded-lg border border-neutral-200 p-4 text-left hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900"
+        className="flex flex-col items-start gap-1 rounded-2xl border border-navy-800 bg-navy-900 p-4 text-left transition-colors hover:border-navy-700"
       >
-        <span className="text-sm font-semibold">{t("home.allPhotos")}</span>
-        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-          {t("home.allPhotosHint")}
+        <span className="flex items-center gap-1.5 font-serif text-sm font-semibold text-mist-100">
+          <Images className="h-3.5 w-3.5 text-blue-400" />
+          {t("home.allPhotos")}
         </span>
+        <span className="text-xs text-mist-500">{t("home.allPhotosHint")}</span>
       </button>
 
       <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+        <h2 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-mist-500">
           {t("home.events")}
         </h2>
         {events.length === 0 ? (
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            {t("home.noEvents")}
-          </p>
+          <p className="text-sm text-mist-500">{t("home.noEvents")}</p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
+          >
             {events.map((event) => (
-              <button
+              <motion.button
                 key={event.id}
+                variants={staggerItem}
                 type="button"
                 onClick={() => onSelectEvent(event.id)}
-                className="flex flex-col items-start gap-1 rounded-lg border border-neutral-200 bg-white p-3 text-left shadow-sm transition hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900"
+                className="flex flex-col items-start gap-1 rounded-2xl border border-navy-800 bg-navy-900 p-3 text-left transition-colors hover:border-navy-700"
               >
-                <span className="truncate text-sm font-medium">
+                <span className="truncate font-serif text-sm font-medium text-mist-100">
                   {event.name}
                 </span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                <span className="text-xs text-mist-500">
                   {t(
                     event.photoCount === 1
                       ? "home.photoCountOne"
@@ -87,9 +92,9 @@ export function HomeView({
                     { count: event.photoCount },
                   )}
                 </span>
-              </button>
+              </motion.button>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

@@ -1,11 +1,10 @@
 import { unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type {
   BackfillResponseBody,
-  FailedPhoto,
   PhotoDetail,
   PhotoSummary,
   SelectRegionResponseBody,
@@ -122,28 +121,6 @@ async function loadPhotoDetail(id: string): Promise<PhotoDetail | null> {
 }
 
 export const photosRoutes = new Elysia({ prefix: "/photos" })
-  .get("/failed", async (): Promise<FailedPhoto[]> => {
-    const rows = await db
-      .select({
-        id: photos.id,
-        eventId: photos.eventId,
-        filename: photos.filename,
-        takenAt: photos.takenAt,
-        errorMessage: photos.errorMessage,
-        createdAt: photos.createdAt,
-      })
-      .from(photos)
-      .where(eq(photos.status, "failed"))
-      .orderBy(desc(photos.createdAt));
-
-    return rows.map((row) => ({
-      id: row.id,
-      eventId: row.eventId,
-      filename: row.filename,
-      takenAt: row.takenAt ? row.takenAt.toISOString() : null,
-      errorMessage: row.errorMessage,
-    }));
-  })
   .get(
     "/:id",
     async ({ params, set }) => {
@@ -207,10 +184,10 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
 
       // Routed through the shared bounded queue so a manual reprocess can't
       // pile on top of a live ingest batch and overload the inference
-      // sidecar. reprocessPhoto records status/errorMessage on the row
-      // itself, so failures are surfaced via the returned detail rather than
-      // a 500 -- this call is only awaited to know when it's safe to read
-      // the fresh detail back.
+      // sidecar. reprocessPhoto records status/errorMessage/processedAt on
+      // the row itself, so failures are surfaced via the returned detail
+      // rather than a 500 -- this call is only awaited to know when it's
+      // safe to read the fresh detail back.
       await enqueue(() =>
         reprocessPhoto(photo.id, PREVIEW_DIR, FACE_THUMBNAIL_DIR),
       ).catch(() => {});

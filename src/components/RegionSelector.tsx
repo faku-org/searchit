@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Sparkles, UserPlus, X } from "lucide-react";
 import type { BoundingBox, SelectRegionAction } from "@searchit/shared";
 import { useTranslation } from "../lib/i18n";
 
@@ -10,6 +11,11 @@ interface RegionSelectorProps {
   visualSearchEnabled: boolean;
   /** Whether face recognition is enabled -- hides "Link as person" when off. */
   faceRecognitionEnabled: boolean;
+  /** Class names for the outer container and the `<img>` itself, so callers
+   * can fit the selector into a landscape (full-width, capped height) or
+   * portrait (narrower, taller) detail layout. */
+  className?: string;
+  imageClassName?: string;
 }
 
 interface DragState {
@@ -34,6 +40,8 @@ export function RegionSelector({
   onSelect,
   visualSearchEnabled,
   faceRecognitionEnabled,
+  className = "relative inline-block w-full select-none",
+  imageClassName = "block max-h-[60vh] w-full rounded-xl object-contain",
 }: RegionSelectorProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -154,7 +162,7 @@ export function RegionSelector({
   return (
     <div
       ref={containerRef}
-      className="relative inline-block select-none"
+      className={className}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -164,12 +172,12 @@ export function RegionSelector({
         src={src}
         alt={alt}
         draggable={false}
-        className="block max-h-[60vh] w-full rounded object-contain"
+        className={imageClassName}
       />
 
       {displayRect && (
         <div
-          className="pointer-events-none absolute border-2 border-sky-400 bg-sky-400/10"
+          className="pointer-events-none absolute border-2 border-blue-400 bg-blue-400/10"
           style={{
             left: displayRect.left,
             top: displayRect.top,
@@ -181,7 +189,7 @@ export function RegionSelector({
 
       {committedRect && displayRect && (
         <div
-          className="absolute z-10 flex gap-1 rounded-md bg-neutral-900 p-1 text-xs shadow-lg"
+          className="absolute z-10 flex gap-1 rounded-xl border border-navy-700 bg-navy-900 p-1 text-xs shadow-lg"
           style={{
             left: displayRect.left,
             top: displayRect.top + displayRect.height + 4,
@@ -192,8 +200,9 @@ export function RegionSelector({
             <button
               type="button"
               onClick={() => handleAction("similar")}
-              className="rounded px-2 py-1 text-white hover:bg-neutral-700"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-mist-100 hover:bg-navy-800"
             >
+              <Sparkles className="h-3 w-3 text-blue-400" />
               {t("region.findSimilar")}
             </button>
           )}
@@ -201,16 +210,18 @@ export function RegionSelector({
             <button
               type="button"
               onClick={() => handleAction("face")}
-              className="rounded px-2 py-1 text-white hover:bg-neutral-700"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-mist-100 hover:bg-navy-800"
             >
+              <UserPlus className="h-3 w-3 text-blue-400" />
               {t("region.linkAsPerson")}
             </button>
           )}
           <button
             type="button"
             onClick={() => setCommittedRect(null)}
-            className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-700"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-mist-500 hover:bg-navy-800"
           >
+            <X className="h-3 w-3" />
             {t("common.cancel")}
           </button>
         </div>

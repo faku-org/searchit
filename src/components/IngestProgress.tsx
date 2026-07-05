@@ -1,17 +1,14 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import type { StatsResponseBody } from "@searchit/shared";
 import { getStats } from "../lib/api";
 import { useTranslation } from "../lib/i18n";
+import { springTransition } from "../lib/theme";
 
 const POLL_INTERVAL_MS = 3000;
 
-interface IngestProgressProps {
-  /** The Dev view always shows this, even when idle; elsewhere it auto-hides once nothing's in flight. */
-  alwaysVisible?: boolean;
-}
-
-/** Live ingest progress bar, polling GET /stats. Shared by the Home screen and the Developer view. */
-export function IngestProgress({ alwaysVisible = false }: IngestProgressProps) {
+/** Live ingest progress bar, polling GET /stats. Auto-hides once nothing's in flight. */
+export function IngestProgress() {
   const { t } = useTranslation();
   const [stats, setStats] = useState<StatsResponseBody | null>(null);
 
@@ -35,14 +32,14 @@ export function IngestProgress({ alwaysVisible = false }: IngestProgressProps) {
   if (!stats) return null;
 
   const inFlight = stats.pending + stats.active + stats.queued;
-  if (inFlight === 0 && !alwaysVisible) return null;
+  if (inFlight === 0) return null;
 
   const percent =
     stats.total > 0 ? Math.round((stats.processed / stats.total) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-neutral-200 p-3 text-xs dark:border-neutral-800">
-      <div className="flex items-center justify-between gap-2 text-neutral-500 dark:text-neutral-400">
+    <div className="flex flex-col gap-1.5 rounded-2xl border border-navy-800 bg-navy-900 p-3 text-xs">
+      <div className="flex items-center justify-between gap-2 text-mist-500">
         <span>
           {t("progress.label", {
             processed: stats.processed,
@@ -58,10 +55,12 @@ export function IngestProgress({ alwaysVisible = false }: IngestProgressProps) {
           )}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
-        <div
-          className="h-full rounded-full bg-neutral-900 transition-[width] dark:bg-neutral-100"
-          style={{ width: `${percent}%` }}
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-navy-800">
+        <motion.div
+          className="h-full rounded-full bg-blue-500"
+          initial={{ width: 0 }}
+          animate={{ width: `${percent}%` }}
+          transition={springTransition}
         />
       </div>
     </div>

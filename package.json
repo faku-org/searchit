@@ -23,6 +23,8 @@
     "db:migrate": "bun run --cwd server db:migrate"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@fontsource/ibm-plex-serif": "^5.2.7",
     "@searchit/shared": "workspace:*",
     "@tailwindcss/vite": "^4.3.2",
     "@tauri-apps/api": "^2",
@@ -32,6 +34,7 @@
     "@tauri-apps/plugin-updater": "^2.10.1",
     "autoprefixer": "^10.5.2",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.23.0",
     "motion": "^12.42.2",
     "postcss": "^8.5.16",
     "react": "^19.1.0",

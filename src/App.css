@@ -1,1 +1,37 @@
 @import "tailwindcss";
+
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-serif/500.css";
+@import "@fontsource/ibm-plex-serif/600.css";
+@import "@fontsource/ibm-plex-serif/700.css";
+
+/*
+ * Brand palette (#0F2854 / #1C4D8D / #4988C4 / #BDE8F5) extended into a full
+ * dark-mode scale. This app is dark-only -- the reference design has no light
+ * variant, and a permanently dark UI suits long photo-culling sessions (same
+ * choice most pro photo tools default to), so there is no `dark:` variant
+ * duplication anywhere in the app: these tokens ARE the theme.
+ */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "IBM Plex Serif", ui-serif, Georgia, serif;
+
+  --color-navy-950: #071226; /* app background */
+  --color-navy-900: #0f2854; /* panel / card surface (brand) */
+  --color-navy-800: #16305f; /* raised surface, inputs, hover */
+  --color-navy-700: #1c4d8d; /* borders, secondary buttons, inactive pills (brand) */
+  --color-navy-600: #336ba9; /* hover border / secondary accent */
+
+  --color-blue-500: #4988c4; /* primary accent -- buttons, active tab, links (brand) */
+  --color-blue-400: #6a9dcf; /* hover / lighter primary */
+  --color-blue-300: #83b8dd; /* subtle accent, default icon tint */
+
+  --color-ice-200: #bde8f5; /* highlight text, focus rings, badges (brand) */
+  --color-ice-100: #def4fa; /* light badge fill */
+
+  --color-mist-100: #f5fcfe; /* primary text on dark */
+  --color-mist-300: #b7c8dc; /* secondary text */
+  --color-mist-500: #7488a6; /* muted text, placeholders */
+}

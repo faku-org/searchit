@@ -80,7 +80,7 @@ async function reprocessPhotoInternal(
 
     await db
       .update(photos)
-      .set({ status: "processed" })
+      .set({ status: "processed", processedAt: new Date() })
       .where(eq(photos.id, photoId));
   } catch (error) {
     await db

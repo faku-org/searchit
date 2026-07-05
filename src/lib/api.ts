@@ -4,15 +4,17 @@ import type {
   ConfigResponseBody,
   CreateEventRequestBody,
   CreateLocationRequestBody,
+  DeveloperStatsResponseBody,
   DiagnosticsResponseBody,
   EventSummary,
-  FailedPhoto,
+  FailedPhotoSummary,
   IdentitySummary,
   LocationSummary,
   MatchFaceResponseBody,
   PhotoDetail,
   PhotoSummary,
   ReprocessFailedResponseBody,
+  RetryPhotoResponseBody,
   SearchFilters,
   SelectRegionAction,
   SelectRegionResponseBody,
@@ -166,10 +168,18 @@ export function getDiagnostics(): Promise<DiagnosticsResponseBody> {
   return apiFetch<DiagnosticsResponseBody>("/diagnostics");
 }
 
-export function getFailedPhotos(): Promise<FailedPhoto[]> {
-  return apiFetch<FailedPhoto[]>("/photos/failed");
-}
-
 export function reprocessFailed(): Promise<ReprocessFailedResponseBody> {
   return apiJsonRequest("POST", "/photos/reprocess-failed");
+}
+
+export function getDeveloperStats(): Promise<DeveloperStatsResponseBody> {
+  return apiFetch<DeveloperStatsResponseBody>("/developer/stats");
+}
+
+export function getFailedPhotos(): Promise<FailedPhotoSummary[]> {
+  return apiFetch<FailedPhotoSummary[]>("/developer/failed-photos");
+}
+
+export function retryFailedPhoto(id: string): Promise<RetryPhotoResponseBody> {
+  return apiJsonRequest("POST", `/developer/failed-photos/${id}/retry`);
 }
