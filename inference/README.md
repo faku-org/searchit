@@ -58,7 +58,21 @@ directly.
   for free -- Apple Vision on macOS, `Windows.Media.Ocr` on Windows -- with no
   model download at all. Any other platform (e.g. Linux dev machines) falls
   back to a small bundled ONNX OCR model (RapidOCR), which ships its own
-  weights in the pip package.
+  weights in the pip package. Since that fallback is unreachable on either
+  platform this app actually ships for, `scripts/bundle-inference.mjs`
+  doesn't `--collect-data` RapidOCR's weights into the shipped sidecar --
+  only a local `uv run` on some other OS would ever need them.
+
+Two capabilities beyond OCR can be turned off entirely from the desktop
+client's Settings (face recognition, visual/text search) -- see
+`FACE_RECOGNITION_ENABLED`/`VISUAL_SEARCH_ENABLED` in
+`server/src/ingest/pipeline.ts`. When off, this service's `/detect-faces` or
+`/embed-image` endpoint is simply never called, so insightface/CLIP never
+download or load on that machine. There's no macOS-native swap for either:
+Apple's Vision framework has no public face-*recognition* embedding API
+(only detection), and its `VNGenerateImageFeaturePrintRequest` has no text
+encoder, so it can't replace CLIP's `embed_text()` (the free-text photo
+search feature).
 
 `config.get_execution_providers()` picks the best available onnxruntime
 execution provider at runtime (`ort.get_available_providers()`), in this

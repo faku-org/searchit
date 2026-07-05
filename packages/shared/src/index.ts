@@ -162,6 +162,10 @@ export interface ReprocessFailedResponseBody {
 export interface ConfigResponseBody {
   /** Absolute path the server watches for new photos to ingest. */
   watchDir: string;
+  /** Whether identity matching runs at all (see server/src/ingest/pipeline.ts). */
+  faceRecognitionEnabled: boolean;
+  /** Whether visual/text photo search runs at all (see server/src/ingest/pipeline.ts). */
+  visualSearchEnabled: boolean;
 }
 
 export interface StatsResponseBody {

@@ -6,6 +6,10 @@ interface RegionSelectorProps {
   src: string;
   alt: string;
   onSelect: (bbox: BoundingBox, action: SelectRegionAction) => void;
+  /** Whether CLIP-based visual search is enabled -- hides "Find similar" when off. */
+  visualSearchEnabled: boolean;
+  /** Whether face recognition is enabled -- hides "Link as person" when off. */
+  faceRecognitionEnabled: boolean;
 }
 
 interface DragState {
@@ -24,7 +28,13 @@ interface Rect {
 
 const MIN_SELECTION_PX = 8;
 
-export function RegionSelector({ src, alt, onSelect }: RegionSelectorProps) {
+export function RegionSelector({
+  src,
+  alt,
+  onSelect,
+  visualSearchEnabled,
+  faceRecognitionEnabled,
+}: RegionSelectorProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -178,20 +188,24 @@ export function RegionSelector({ src, alt, onSelect }: RegionSelectorProps) {
           }}
           onMouseDown={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
-            onClick={() => handleAction("similar")}
-            className="rounded px-2 py-1 text-white hover:bg-neutral-700"
-          >
-            {t("region.findSimilar")}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction("face")}
-            className="rounded px-2 py-1 text-white hover:bg-neutral-700"
-          >
-            {t("region.linkAsPerson")}
-          </button>
+          {visualSearchEnabled && (
+            <button
+              type="button"
+              onClick={() => handleAction("similar")}
+              className="rounded px-2 py-1 text-white hover:bg-neutral-700"
+            >
+              {t("region.findSimilar")}
+            </button>
+          )}
+          {faceRecognitionEnabled && (
+            <button
+              type="button"
+              onClick={() => handleAction("face")}
+              className="rounded px-2 py-1 text-white hover:bg-neutral-700"
+            >
+              {t("region.linkAsPerson")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setCommittedRect(null)}

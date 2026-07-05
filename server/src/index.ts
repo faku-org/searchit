@@ -21,6 +21,13 @@ const HOST = process.env.HOST ?? "127.0.0.1";
 const WATCH_DIR_CONFIG = process.env.SEARCHIT_WATCH_DIR;
 const PREVIEW_DIR_CONFIG = process.env.SEARCHIT_PREVIEW_DIR;
 const FACE_THUMBNAIL_DIR_CONFIG = process.env.SEARCHIT_FACE_THUMBNAIL_DIR;
+// Mirrors pipeline.ts's own read of these same env vars -- reported here so
+// the client can hide People/visual-search UI to match what the pipeline is
+// actually doing, regardless of whether it's running under the Tauri shell
+// (which sets these) or a plain browser dev setup pointed at a manually
+// configured server.
+const FACE_RECOGNITION_ENABLED = process.env.FACE_RECOGNITION_ENABLED !== "false";
+const VISUAL_SEARCH_ENABLED = process.env.VISUAL_SEARCH_ENABLED !== "false";
 
 if (!WATCH_DIR_CONFIG || !PREVIEW_DIR_CONFIG || !FACE_THUMBNAIL_DIR_CONFIG) {
   throw new Error(
@@ -50,7 +57,11 @@ const app = new Elysia()
     ok: true,
     inference: await checkInferenceHealth(),
   }))
-  .get("/config", () => ({ watchDir: WATCH_DIR }))
+  .get("/config", () => ({
+    watchDir: WATCH_DIR,
+    faceRecognitionEnabled: FACE_RECOGNITION_ENABLED,
+    visualSearchEnabled: VISUAL_SEARCH_ENABLED,
+  }))
   .use(searchRoutes)
   .use(photosRoutes)
   .use(eventsRoutes)

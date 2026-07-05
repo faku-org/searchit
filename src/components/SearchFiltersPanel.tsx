@@ -12,6 +12,8 @@ interface SearchFiltersPanelProps {
   onChange: (filters: SearchFilters) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  /** Whether CLIP-based visual/text search is enabled -- hides the "describe what you're looking for" field when off, since it has no embeddings to search against. */
+  visualSearchEnabled: boolean;
 }
 
 export function SearchFiltersPanel({
@@ -21,6 +23,7 @@ export function SearchFiltersPanel({
   onChange,
   onSubmit,
   isLoading,
+  visualSearchEnabled,
 }: SearchFiltersPanelProps) {
   const { t } = useTranslation();
 
@@ -119,17 +122,19 @@ export function SearchFiltersPanel({
         />
       </Field>
 
-      <Field label={t("filters.describe")}>
-        <input
-          type="text"
-          value={filters.visualQuery ?? ""}
-          onChange={(event) =>
-            update("visualQuery", event.target.value || undefined)
-          }
-          placeholder={t("filters.describePlaceholder")}
-          className={`${inputClass} w-40`}
-        />
-      </Field>
+      {visualSearchEnabled && (
+        <Field label={t("filters.describe")}>
+          <input
+            type="text"
+            value={filters.visualQuery ?? ""}
+            onChange={(event) =>
+              update("visualQuery", event.target.value || undefined)
+            }
+            placeholder={t("filters.describePlaceholder")}
+            className={`${inputClass} w-40`}
+          />
+        </Field>
+      )}
 
       <Field label={t("filters.sceneText")}>
         <input

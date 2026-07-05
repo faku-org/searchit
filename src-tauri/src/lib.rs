@@ -8,7 +8,7 @@ use tauri_plugin_shell::ShellExt;
 
 /// Whether the watch folder defaults to the OS Pictures folder on every
 /// launch, or remembers whatever folder was last picked via `set_watch_dir`.
-/// Persisted to `settings.json` (see `load_watch_settings`/`save_watch_settings`)
+/// Persisted to `settings.json` (see `load_app_settings`/`save_app_settings`)
 /// so the choice survives app restarts, unlike the watch dir itself which the
 /// server has no runtime API to change (hence the sidecar restart dance).
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -20,26 +20,45 @@ enum WatchDirMode {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct WatchSettings {
+struct AppSettings {
     watch_dir_mode: WatchDirMode,
     last_watch_dir: Option<String>,
+    // Both default true (today's behavior) -- turning either off means the
+    // corresponding inference endpoint is never called, so its model
+    // (insightface/ArcFace, CLIP) never even gets downloaded. There's no
+    // macOS-native replacement for either (Vision has no public face-
+    // recognition embedding API, and its FeaturePrint has no text encoder
+    // for the free-text photo search CLIP powers), so this on/off switch is
+    // the actual lever for a leaner footprint, not a per-platform model swap.
+    #[serde(default = "default_true")]
+    face_recognition_enabled: bool,
+    #[serde(default = "default_true")]
+    visual_search_enabled: bool,
 }
 
-impl Default for WatchSettings {
+fn default_true() -> bool {
+    true
+}
+
+impl Default for AppSettings {
     fn default() -> Self {
-        WatchSettings {
+        AppSettings {
             watch_dir_mode: WatchDirMode::Pictures,
             last_watch_dir: None,
+            face_recognition_enabled: true,
+            visual_search_enabled: true,
         }
     }
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct WatchSettingsResponse {
+struct AppSettingsResponse {
     mode: WatchDirMode,
     current_watch_dir: String,
     pictures_dir: String,
+    face_recognition_enabled: bool,
+    visual_search_enabled: bool,
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -47,7 +66,7 @@ fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("settings.json"))
 }
 
-fn load_watch_settings(app: &tauri::AppHandle) -> WatchSettings {
+fn load_app_settings(app: &tauri::AppHandle) -> AppSettings {
     settings_path(app)
         .ok()
         .and_then(|path| std::fs::read_to_string(path).ok())
@@ -55,7 +74,7 @@ fn load_watch_settings(app: &tauri::AppHandle) -> WatchSettings {
         .unwrap_or_default()
 }
 
-fn save_watch_settings(app: &tauri::AppHandle, settings: &WatchSettings) -> Result<(), String> {
+fn save_app_settings(app: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String> {
     let path = settings_path(app)?;
     let contents = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     std::fs::write(path, contents).map_err(|e| e.to_string())
@@ -77,9 +96,9 @@ struct ServerProcess(Mutex<Option<CommandChild>>);
 struct InferenceProcess(Mutex<Option<CommandChild>>);
 
 /// The watch dir the server sidecar is actually running against right now --
-/// tracked separately from `WatchSettings` on disk because in "last" mode the
+/// tracked separately from `AppSettings` on disk because in "last" mode the
 /// remembered folder can vanish (deleted/unmounted) and silently fall back to
-/// Pictures, which `get_watch_settings` needs to report accurately.
+/// Pictures, which `get_app_settings` needs to report accurately.
 struct CurrentWatchDir(Mutex<Option<PathBuf>>);
 
 /// The bundled server's resolved URL, set once during `setup()` (it binds to
@@ -138,6 +157,8 @@ fn spawn_server<R: tauri::Runtime>(
     resource_dir: &Path,
     config: &ServerConfig,
     watch_dir: &Path,
+    face_recognition_enabled: bool,
+    visual_search_enabled: bool,
 ) -> Result<CommandChild, tauri_plugin_shell::Error> {
     let server_entry = resource_dir.join("server").join("src").join("index.ts");
     let (rx, child) = app
@@ -157,6 +178,8 @@ fn spawn_server<R: tauri::Runtime>(
         .env("INFERENCE_URL", config.inference_url.clone())
         .env("HOST", "127.0.0.1")
         .env("PORT", config.port.to_string())
+        .env("FACE_RECOGNITION_ENABLED", face_recognition_enabled.to_string())
+        .env("VISUAL_SEARCH_ENABLED", visual_search_enabled.to_string())
         .spawn()?;
     pipe_sidecar_output("server", rx);
     Ok(child)
@@ -188,7 +211,16 @@ fn restart_server_with_watch_dir(
 
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     let config = app.state::<ServerConfig>();
-    let child = spawn_server(app, &resource_dir, &config, &watch_dir).map_err(|e| e.to_string())?;
+    let settings = load_app_settings(app);
+    let child = spawn_server(
+        app,
+        &resource_dir,
+        &config,
+        &watch_dir,
+        settings.face_recognition_enabled,
+        settings.visual_search_enabled,
+    )
+    .map_err(|e| e.to_string())?;
     app.state::<ServerProcess>().0.lock().unwrap().replace(child);
     app.state::<CurrentWatchDir>()
         .0
@@ -207,20 +239,21 @@ fn restart_server_with_watch_dir(
 fn set_watch_dir(app: tauri::AppHandle, new_dir: String) -> Result<(), String> {
     let watch_dir = PathBuf::from(&new_dir);
 
-    let mut settings = load_watch_settings(&app);
+    let mut settings = load_app_settings(&app);
     settings.watch_dir_mode = WatchDirMode::Last;
     settings.last_watch_dir = Some(new_dir);
-    save_watch_settings(&app, &settings)?;
+    save_app_settings(&app, &settings)?;
 
     restart_server_with_watch_dir(&app, watch_dir)
 }
 
 /// Reports the current watch-dir mode, the folder actually in effect right
-/// now, and the OS Pictures folder path (so the Settings UI can offer
-/// "Reset to Pictures" without a round trip through the native folder picker).
+/// now, the OS Pictures folder path (so the Settings UI can offer "Reset to
+/// Pictures" without a round trip through the native folder picker), and the
+/// two optional-capability toggles (face recognition, visual/text search).
 #[tauri::command]
-fn get_watch_settings(app: tauri::AppHandle) -> Result<WatchSettingsResponse, String> {
-    let settings = load_watch_settings(&app);
+fn get_app_settings(app: tauri::AppHandle) -> Result<AppSettingsResponse, String> {
+    let settings = load_app_settings(&app);
     let pictures_dir = app.path().picture_dir().map_err(|e| e.to_string())?;
     let current_watch_dir = app
         .state::<CurrentWatchDir>()
@@ -230,10 +263,12 @@ fn get_watch_settings(app: tauri::AppHandle) -> Result<WatchSettingsResponse, St
         .clone()
         .ok_or_else(|| "watch dir not ready yet".to_string())?;
 
-    Ok(WatchSettingsResponse {
+    Ok(AppSettingsResponse {
         mode: settings.watch_dir_mode,
         current_watch_dir: current_watch_dir.to_string_lossy().to_string(),
         pictures_dir: pictures_dir.to_string_lossy().to_string(),
+        face_recognition_enabled: settings.face_recognition_enabled,
+        visual_search_enabled: settings.visual_search_enabled,
     })
 }
 
@@ -244,9 +279,9 @@ fn get_watch_settings(app: tauri::AppHandle) -> Result<WatchSettingsResponse, St
 /// longer exists) when switching to "last".
 #[tauri::command]
 fn set_watch_dir_mode(app: tauri::AppHandle, mode: WatchDirMode) -> Result<(), String> {
-    let mut settings = load_watch_settings(&app);
+    let mut settings = load_app_settings(&app);
     settings.watch_dir_mode = mode.clone();
-    save_watch_settings(&app, &settings)?;
+    save_app_settings(&app, &settings)?;
 
     let pictures_dir = app.path().picture_dir().map_err(|e| e.to_string())?;
     let watch_dir = match mode {
@@ -260,6 +295,44 @@ fn set_watch_dir_mode(app: tauri::AppHandle, mode: WatchDirMode) -> Result<(), S
     };
 
     restart_server_with_watch_dir(&app, watch_dir)
+}
+
+/// Reads the folder the server sidecar is already running against (tracked
+/// separately from `AppSettings` -- see `CurrentWatchDir`'s doc comment) so
+/// the two toggle commands below can restart the sidecar in place, without
+/// duplicating `set_watch_dir`'s folder-resolution logic just to flip a flag.
+fn current_watch_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.state::<CurrentWatchDir>()
+        .0
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "watch dir not ready yet".to_string())
+}
+
+/// Toggles face recognition (identity matching) on or off. Off means the
+/// server's ingest pipeline never calls `/detect-faces` at all, so
+/// insightface's model is never downloaded or loaded on this machine.
+/// Turning it back on later requires running "Reprocess" / the backfill
+/// button to populate embeddings for photos ingested while it was off.
+#[tauri::command]
+fn set_face_recognition_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = load_app_settings(&app);
+    settings.face_recognition_enabled = enabled;
+    save_app_settings(&app, &settings)?;
+
+    restart_server_with_watch_dir(&app, current_watch_dir(&app)?)
+}
+
+/// Toggles visual + free-text photo search (CLIP embeddings) on or off, same
+/// mechanics as `set_face_recognition_enabled` above but for `/embed-image`.
+#[tauri::command]
+fn set_visual_search_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = load_app_settings(&app);
+    settings.visual_search_enabled = enabled;
+    save_app_settings(&app, &settings)?;
+
+    restart_server_with_watch_dir(&app, current_watch_dir(&app)?)
 }
 
 /// Opens the OS file manager with `path` selected, so the photographer can
@@ -321,7 +394,7 @@ pub fn run() {
             // import tool normally drops files; "remember last used folder"
             // (set via the Settings UI or the folder picker) is opt-in and
             // persisted in settings.json, not the default.
-            let watch_settings = load_watch_settings(&app.handle());
+            let watch_settings = load_app_settings(&app.handle());
             let pictures_dir = app
                 .path()
                 .picture_dir()
@@ -364,8 +437,15 @@ pub fn run() {
                 inference_url,
                 port: server_port,
             };
-            let server_child = spawn_server(&app.handle(), &resource_dir, &server_config, &watch_dir)
-                .expect("failed to spawn bundled server sidecar");
+            let server_child = spawn_server(
+                &app.handle(),
+                &resource_dir,
+                &server_config,
+                &watch_dir,
+                watch_settings.face_recognition_enabled,
+                watch_settings.visual_search_enabled,
+            )
+            .expect("failed to spawn bundled server sidecar");
             app.state::<ServerProcess>()
                 .0
                 .lock()
@@ -435,8 +515,10 @@ pub fn run() {
             reveal_in_file_manager,
             get_backend_url,
             set_watch_dir,
-            get_watch_settings,
-            set_watch_dir_mode
+            get_app_settings,
+            set_watch_dir_mode,
+            set_face_recognition_enabled,
+            set_visual_search_enabled
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

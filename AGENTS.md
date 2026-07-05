@@ -129,8 +129,8 @@ haversine distance filter in JS.
 
 ### Client (src/)
 
-`App.tsx` is the single state owner — tab (`photos`/`people`/`map`), filters,
-selected photo/identity, an in-progress "similarity query" (from a
+`App.tsx` is the single state owner — tab (`home`/`photos`/`people`/`map`/`dev`),
+filters, selected photo/identity, an in-progress "similarity query" (from a
 region-select "find similar"), pending new-location, etc. Every component
 under `src/components/` is presentational and talks back through callback
 props; all network access goes through `src/lib/api.ts`, a thin fetch wrapper
@@ -140,6 +140,23 @@ server sidecar's actual dynamically-chosen port (via the `get_backend_url`
 Tauri command) before making any API call; the manual override in the header
 input remains for the power-user case of pointing at a different machine's
 server instead of the local bundled one.
+
+Two optional, model-download-dependent capabilities -- face recognition
+(identity matching) and visual/free-text photo search (CLIP) -- can be
+turned off from Settings (`SettingsModal.tsx`), persisted in
+`src-tauri`'s `AppSettings`/`settings.json` and passed to the server sidecar
+as `FACE_RECOGNITION_ENABLED`/`VISUAL_SEARCH_ENABLED` env vars (read in
+`server/src/ingest/pipeline.ts`, which then skips calling `/detect-faces` or
+`/embed-image` entirely -- so insightface/CLIP never even get downloaded on
+that machine). The client hides the People tab and the visual-search/
+face-linking controls accordingly (`App.tsx`'s `faceRecognitionEnabled`/
+`visualSearchEnabled` state, sourced from both the server's `/config` and
+the Tauri settings response). There's no macOS-native replacement for
+either: Apple's Vision framework has no public face-*recognition* embedding
+API (only detection), and its `VNGenerateImageFeaturePrintRequest` has no
+text encoder, so it can't power the free-text search CLIP's `embed_text()`
+does. OCR is the one capability that's already fully native on macOS/Windows
+with zero download (`inference/ocr_native.py`) -- see `inference/README.md`.
 
 Photos/events/locations/identities are kept fresh by silent polling
 (`POLL_INTERVAL_MS` in `App.tsx`, `PENDING_POLL_INTERVAL_MS` in

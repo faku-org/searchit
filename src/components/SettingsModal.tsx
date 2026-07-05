@@ -1,34 +1,36 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "../lib/i18n";
 import {
-  getWatchSettings,
+  getAppSettings,
   pickWatchFolder,
+  setFaceRecognitionEnabled,
+  setVisualSearchEnabled,
   setWatchDir,
   setWatchDirMode,
+  type AppSettings,
   type WatchDirMode,
-  type WatchSettings,
 } from "../lib/tauri";
 
 interface SettingsModalProps {
   onClose: () => void;
-  /** Lets the parent keep its own compact watch-dir banner in sync. */
-  onWatchDirChanged: (path: string) => void;
+  /** Lets the parent keep its watch-dir banner and People/visual-search UI in sync. */
+  onSettingsChanged: (settings: AppSettings) => void;
 }
 
 export function SettingsModal({
   onClose,
-  onWatchDirChanged,
+  onSettingsChanged,
 }: SettingsModalProps) {
   const { t } = useTranslation();
-  const [settings, setSettings] = useState<WatchSettings | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function loadSettings() {
-    getWatchSettings()
+    getAppSettings()
       .then((loaded) => {
         setSettings(loaded);
-        onWatchDirChanged(loaded.currentWatchDir);
+        onSettingsChanged(loaded);
       })
       .catch(() => setError(t("settings.loadError")));
   }
@@ -62,6 +64,32 @@ export function SettingsModal({
       loadSettings();
     } catch {
       setError(t("header.changeWatchDirError"));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleFaceRecognitionChange(enabled: boolean) {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await setFaceRecognitionEnabled(enabled);
+      loadSettings();
+    } catch {
+      setError(t("settings.loadError"));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleVisualSearchChange(enabled: boolean) {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await setVisualSearchEnabled(enabled);
+      loadSettings();
+    } catch {
+      setError(t("settings.loadError"));
     } finally {
       setIsBusy(false);
     }
@@ -139,6 +167,37 @@ export function SettingsModal({
                 {t("settings.resetToPictures")}
               </button>
             </div>
+
+            <fieldset className="flex flex-col gap-2 border-t border-neutral-200 pt-3 text-sm dark:border-neutral-800">
+              <legend className="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                {t("settings.capabilities")}
+              </legend>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.faceRecognitionEnabled}
+                  disabled={isBusy}
+                  onChange={(event) =>
+                    void handleFaceRecognitionChange(event.target.checked)
+                  }
+                />
+                {t("settings.faceRecognition")}
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.visualSearchEnabled}
+                  disabled={isBusy}
+                  onChange={(event) =>
+                    void handleVisualSearchChange(event.target.checked)
+                  }
+                />
+                {t("settings.visualSearch")}
+              </label>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                {t("settings.capabilitiesHint")}
+              </p>
+            </fieldset>
           </>
         )}
       </div>

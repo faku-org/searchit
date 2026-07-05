@@ -32,19 +32,33 @@ export function setWatchDir(path: string): Promise<void> {
 
 export type WatchDirMode = "pictures" | "last";
 
-export interface WatchSettings {
+export interface AppSettings {
   mode: WatchDirMode;
   /** The folder actually in effect right now (may differ from a stale remembered folder that no longer exists). */
   currentWatchDir: string;
   /** The OS Pictures folder path, for a "Reset to Pictures" control. */
   picturesDir: string;
+  /** Whether identity matching runs at all -- off skips insightface entirely, so its model is never downloaded. */
+  faceRecognitionEnabled: boolean;
+  /** Whether visual/text photo search runs at all -- off skips CLIP entirely, so its model is never downloaded. */
+  visualSearchEnabled: boolean;
 }
 
-export function getWatchSettings(): Promise<WatchSettings> {
-  return invoke("get_watch_settings");
+export function getAppSettings(): Promise<AppSettings> {
+  return invoke("get_app_settings");
 }
 
 /** Switches between "always use Pictures" and "remember last used folder", restarting the server sidecar accordingly. */
 export function setWatchDirMode(mode: WatchDirMode): Promise<void> {
   return invoke("set_watch_dir_mode", { mode });
+}
+
+/** Toggles face recognition (identity matching), restarting the server sidecar with the new flag. */
+export function setFaceRecognitionEnabled(enabled: boolean): Promise<void> {
+  return invoke("set_face_recognition_enabled", { enabled });
+}
+
+/** Toggles visual + free-text photo search (CLIP), restarting the server sidecar with the new flag. */
+export function setVisualSearchEnabled(enabled: boolean): Promise<void> {
+  return invoke("set_visual_search_enabled", { enabled });
 }

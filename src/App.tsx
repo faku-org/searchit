@@ -71,6 +71,8 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isTaggingLocation, setIsTaggingLocation] = useState(false);
   const [watchDir, setWatchDir] = useState<string | null>(null);
+  const [faceRecognitionEnabled, setFaceRecognitionEnabled] = useState(true);
+  const [visualSearchEnabled, setVisualSearchEnabled] = useState(true);
   const [pendingLocation, setPendingLocation] =
     useState<PendingLocation | null>(null);
 
@@ -137,9 +139,20 @@ function App() {
     refreshLocations();
     void runSearch();
     getConfig()
-      .then((config) => setWatchDir(config.watchDir))
+      .then((config) => {
+        setWatchDir(config.watchDir);
+        setFaceRecognitionEnabled(config.faceRecognitionEnabled);
+        setVisualSearchEnabled(config.visualSearchEnabled);
+      })
       .catch(() => setWatchDir(null));
   }, [isBackendUrlResolved]);
+
+  // Face recognition can be turned off while the People tab is open (e.g.
+  // from Settings) -- bounce back to Home rather than leaving the user on a
+  // tab whose nav button just disappeared.
+  useEffect(() => {
+    if (tab === "people" && !faceRecognitionEnabled) setTab("home");
+  }, [tab, faceRecognitionEnabled]);
 
   // The server ingests new photos in the background (folder watcher +
   // inference pipeline), and other clients may create events/locations at
@@ -312,15 +325,17 @@ function App() {
             >
               {t("nav.photos")}
             </TabButton>
-            <TabButton
-              active={tab === "people"}
-              onClick={() => {
-                setTab("people");
-                setSelectedIdentity(null);
-              }}
-            >
-              {t("nav.people")}
-            </TabButton>
+            {faceRecognitionEnabled && (
+              <TabButton
+                active={tab === "people"}
+                onClick={() => {
+                  setTab("people");
+                  setSelectedIdentity(null);
+                }}
+              >
+                {t("nav.people")}
+              </TabButton>
+            )}
             <TabButton active={tab === "map"} onClick={() => setTab("map")}>
               {t("nav.map")}
             </TabButton>
@@ -345,7 +360,7 @@ function App() {
                 : t("header.tagLocation")}
             </button>
           )}
-          {tab === "people" && (
+          {tab === "people" && faceRecognitionEnabled && (
             <button
               type="button"
               onClick={() => setShowIdentifyModal(true)}
@@ -466,6 +481,7 @@ function App() {
               onChange={setFilters}
               onSubmit={() => void runSearch()}
               isLoading={isLoading}
+              visualSearchEnabled={visualSearchEnabled}
             />
             <ResultsGrid
               photos={photos}
@@ -521,7 +537,11 @@ function App() {
       {showSettingsModal && (
         <SettingsModal
           onClose={() => setShowSettingsModal(false)}
-          onWatchDirChanged={setWatchDir}
+          onSettingsChanged={(settings) => {
+            setWatchDir(settings.currentWatchDir);
+            setFaceRecognitionEnabled(settings.faceRecognitionEnabled);
+            setVisualSearchEnabled(settings.visualSearchEnabled);
+          }}
         />
       )}
 
@@ -559,6 +579,8 @@ function App() {
           photoId={selectedPhotoId}
           onClose={() => setSelectedPhotoId(null)}
           onFindSimilar={handleFindSimilar}
+          visualSearchEnabled={visualSearchEnabled}
+          faceRecognitionEnabled={faceRecognitionEnabled}
         />
       )}
     </main>

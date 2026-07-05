@@ -24,12 +24,16 @@ interface PhotoDetailPanelProps {
   photoId: string;
   onClose: () => void;
   onFindSimilar: (sourcePhotoId: string, results: PhotoSummary[]) => void;
+  visualSearchEnabled: boolean;
+  faceRecognitionEnabled: boolean;
 }
 
 export function PhotoDetailPanel({
   photoId,
   onClose,
   onFindSimilar,
+  visualSearchEnabled,
+  faceRecognitionEnabled,
 }: PhotoDetailPanelProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<PhotoDetail | null>(null);
@@ -147,6 +151,8 @@ export function PhotoDetailPanel({
                 src={previewUrl(detail.id)}
                 alt={detail.filename}
                 onSelect={(bbox, action) => void handleSelectRegion(bbox, action)}
+                visualSearchEnabled={visualSearchEnabled}
+                faceRecognitionEnabled={faceRecognitionEnabled}
               />
               <p className="mt-1 text-xs text-neutral-500">
                 {t("photoDetail.regionHint")}
