@@ -11,7 +11,8 @@ from fastapi import FastAPI, HTTPException
 from PIL import Image, ImageStat
 from pydantic import BaseModel
 
-from config import get_execution_providers, get_settings
+import hardware
+from config import get_execution_providers, get_settings, resolve_ocr_backend
 
 logger = logging.getLogger("searchit.inference")
 
@@ -116,6 +117,7 @@ class EmbedTextResponse(BaseModel):
 
 class ReadSceneTextRequest(BaseModel):
     imagePath: str
+    minConfidence: float | None = None
 
 
 class ReadSceneTextResponse(BaseModel):
@@ -130,11 +132,24 @@ def health():
     # scripts/smoke-test-sidecars.mjs) confirm e.g. CoreML was really selected
     # on macOS rather than silently falling back to CPU.
     providers = [] if settings.inference_mock else get_execution_providers()
+    deepseek_device = None if settings.inference_mock else resolve_ocr_backend()
     return {
         "ok": True,
         "mock": settings.inference_mock,
         "device": settings.searchit_device,
         "providers": providers,
+        "ocrTier": settings.ocr_tier,
+        # The backend actually in effect right now (None means the native/
+        # ONNX tier), plus what the detector thinks this box could support if
+        # weights were configured -- lets the client show "your GPU supports
+        # the high-quality OCR tier" even before the user opts in.
+        "ocrActiveBackend": deepseek_device,
+        "ocrCapability": {
+            "cuda": hardware.cuda_capable(),
+            "cudaVramGB": hardware.detect_nvidia_vram_gb(),
+            "mps": hardware.mps_capable(),
+            "macUnifiedMemoryGB": hardware.detect_mac_unified_memory_gb(),
+        },
     }
 
 
@@ -179,20 +194,6 @@ def embed_text_endpoint(body: EmbedTextRequest) -> EmbedTextResponse:
     return EmbedTextResponse(embedding=embed_text(body.text))
 
 
-def _use_deepseek_ocr(settings) -> bool:
-    """DeepSeek-OCR-2 is the higher-quality tier, but it's torch+CUDA only
-    (see inference/README.md) -- only usable on a box with the `ml` extra
-    installed and a working NVIDIA GPU. Everywhere else (desktop client
-    machines) falls back to OS-native/ONNX OCR in ocr_native.py."""
-    if not settings.ocr_model_path:
-        return False
-    try:
-        import torch
-    except ImportError:
-        return False
-    return torch.cuda.is_available()
-
-
 @app.post("/read-scene-text", response_model=ReadSceneTextResponse)
 def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextResponse:
     settings = get_settings()
@@ -203,13 +204,20 @@ def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextRespons
     if settings.inference_mock:
         return ReadSceneTextResponse(text=_mock_scene_text(image_path))
 
-    if _use_deepseek_ocr(settings):
+    deepseek_device = resolve_ocr_backend()
+    if deepseek_device is not None:
         from ocr import read_scene_text
-    else:
-        from ocr_native import read_scene_text
+
+        with Image.open(image_path) as img:
+            text = read_scene_text(
+                img.convert("RGB"), min_confidence=body.minConfidence, device=deepseek_device
+            )
+        return ReadSceneTextResponse(text=text)
+
+    from ocr_native import read_scene_text
 
     with Image.open(image_path) as img:
-        text = read_scene_text(img.convert("RGB"))
+        text = read_scene_text(img.convert("RGB"), min_confidence=body.minConfidence)
     return ReadSceneTextResponse(text=text)
 
 

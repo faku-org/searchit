@@ -46,7 +46,8 @@ def _flash_attention_available() -> bool:
     """flash-attn needs a matching CUDA toolchain to build and has no official
     Windows wheels, so it's an opt-in extra (see README) rather than a hard
     dependency -- fall back to eager attention when it isn't installed instead
-    of asking transformers to load a module that isn't there."""
+    of asking transformers to load a module that isn't there. CUDA-only: there
+    is no MPS build of flash-attn, so MPS always uses eager attention."""
     try:
         import flash_attn  # noqa: F401
     except ImportError:
@@ -54,7 +55,7 @@ def _flash_attention_available() -> bool:
     return True
 
 
-def _load_model():
+def _load_model(device: str):
     global _model, _tokenizer
     if _model is not None:
         return _model, _tokenizer
@@ -69,9 +70,7 @@ def _load_model():
             "weights, or a local checkout of them)."
         )
 
-    use_flash_attention = (
-        settings.searchit_device == "cuda" and _flash_attention_available()
-    )
+    use_flash_attention = device == "cuda" and _flash_attention_available()
     _tokenizer = AutoTokenizer.from_pretrained(
         settings.ocr_model_path, trust_remote_code=True
     )
@@ -81,14 +80,18 @@ def _load_model():
         use_safetensors=True,
         _attn_implementation="flash_attention_2" if use_flash_attention else "eager",
     )
-    model = model.eval().to(settings.searchit_device)
-    if settings.searchit_device != "cpu":
+    model = model.eval().to(device)
+    if device != "cpu":
+        # bfloat16 matches the model card's recommended dtype. Unverified on
+        # real Apple Silicon hardware -- MPS bfloat16 op coverage has
+        # historically lagged CUDA's; if this errors out on a real Mac, the
+        # fallback is switching this branch to torch.float16 for device=="mps".
         model = model.to(torch.bfloat16)
     _model = model
     return _model, _tokenizer
 
 
-def read_text(image: "Image") -> str:
+def read_text(image: "Image", device: str = "cuda") -> str:
     """
     Runs DeepSeek-OCR-2 on an image and returns the raw recognized text.
 
@@ -100,7 +103,7 @@ def read_text(image: "Image") -> str:
     shows up in the scratch output dir. Re-verify against the installed model
     version once real weights are in place.
     """
-    model, tokenizer = _load_model()
+    model, tokenizer = _load_model(device)
     settings = get_settings()
 
     scratch_dir = Path(settings.ocr_scratch_dir)
@@ -144,7 +147,11 @@ def read_text(image: "Image") -> str:
         image_path.unlink(missing_ok=True)
 
 
-def read_scene_text(image: "Image") -> str:
+def read_scene_text(
+    image: "Image", min_confidence: float | None = None, device: str = "cuda"
+) -> str:
     """Alias for read_text, named for its call site: general scene text
-    (banners, signs, boards) from the full frame."""
-    return read_text(image)
+    (banners, signs, boards) from the full frame. min_confidence is accepted
+    for call-site parity with ocr_native.read_scene_text but unused here --
+    DeepSeek-OCR-2 returns free text with no per-detection score to filter."""
+    return read_text(image, device=device)
