@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -20,10 +22,72 @@ struct ServerConfig {
 struct ServerProcess(Mutex<Option<CommandChild>>);
 struct InferenceProcess(Mutex<Option<CommandChild>>);
 
+/// Fixed paths/settings the inference sidecar is launched with, computed once
+/// in `setup()` and reused by `restart_inference` (same port, so the
+/// server's already-configured `INFERENCE_URL` stays valid across a restart).
+struct InferenceConfig {
+    entry: PathBuf,
+    model_cache_dir: PathBuf,
+    port: u16,
+}
+
+/// The watch folder the server sidecar is currently running against, kept in
+/// sync by `set_watch_dir` so `restart_server` can respawn against the same
+/// folder without the frontend having to pass it again.
+struct CurrentWatchDir(Mutex<PathBuf>);
+
 /// The bundled server's resolved URL, set once during `setup()` (it binds to
 /// a dynamically-chosen free port). Read by the `get_backend_url` command so
 /// the frontend knows which port to talk to instead of assuming a fixed one.
 struct BackendUrl(Mutex<Option<String>>);
+
+/// Last known state of a sidecar as observed from its `CommandEvent` stream --
+/// there's no other way to tell "crashed" from "still starting" in a packaged
+/// build, since a GUI app has no attached console to show stdout/stderr in.
+#[derive(Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SidecarStatus {
+    running: bool,
+    last_exit_code: Option<i32>,
+    last_error: Option<String>,
+}
+
+/// Keyed by sidecar label ("server" / "inference"), read by the
+/// `get_sidecar_status` command so the Developer tab can show something more
+/// useful than "inference: down" when a sidecar actually crashed.
+struct SidecarStatuses(Mutex<HashMap<&'static str, SidecarStatus>>);
+
+/// Path to the combined sidecar log file under the app's log directory, set
+/// once in `setup()`. Both sidecars' stdout/stderr are appended here since a
+/// packaged app's own stdout/stderr goes nowhere the user can see.
+struct LogFilePath(PathBuf);
+
+/// Wall-clock start of the app, used to prefix log lines with a relative
+/// timestamp without pulling in a datetime crate just for this.
+static APP_START: OnceLock<Instant> = OnceLock::new();
+static LOG_WRITE_LOCK: Mutex<()> = Mutex::new(());
+const MAX_LOG_FILE_BYTES: u64 = 5 * 1024 * 1024;
+
+/// Appends one line to the sidecar log file, truncating it first if it's
+/// grown past `MAX_LOG_FILE_BYTES` (simple rotation -- this log is for "what
+/// just happened", not a long-term audit trail).
+fn append_log(log_path: &Path, line: &str) {
+    let _guard = LOG_WRITE_LOCK.lock().unwrap();
+    if std::fs::metadata(log_path).map(|m| m.len()).unwrap_or(0) > MAX_LOG_FILE_BYTES {
+        let _ = std::fs::write(log_path, "");
+    }
+    let elapsed = APP_START
+        .get()
+        .map(|start| start.elapsed().as_secs_f64())
+        .unwrap_or(0.0);
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+    {
+        let _ = writeln!(file, "[+{elapsed:.3}s] {line}");
+    }
+}
 
 /// Asks the OS for an ephemeral port by binding to port 0, then releasing it
 /// immediately. Small TOCTOU race in principle, but good enough for a
@@ -47,20 +111,56 @@ fn wait_for_port(port: u16, timeout: Duration) {
     }
 }
 
-/// Forwards a sidecar's stdout/stderr to this process's own, prefixed so
-/// server and inference logs stay distinguishable in a single console.
-fn pipe_sidecar_output(
+/// Forwards a sidecar's stdout/stderr to this process's own (useful in `tauri
+/// dev`) and to the persistent sidecar log file (useful in a packaged build,
+/// where nothing shows a GUI app's own console output). Also tracks the
+/// sidecar's running/exit-code/last-error state in `SidecarStatuses` so the
+/// Developer tab can distinguish "crashed" from "still starting".
+fn pipe_sidecar_output<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     label: &'static str,
     mut rx: tauri::async_runtime::Receiver<CommandEvent>,
 ) {
+    app.state::<SidecarStatuses>()
+        .0
+        .lock()
+        .unwrap()
+        .insert(label, SidecarStatus { running: true, last_exit_code: None, last_error: None });
+
+    let log_path = app.state::<LogFilePath>().0.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    print!("[{label}] {}", String::from_utf8_lossy(&line));
+                    let text = String::from_utf8_lossy(&line).to_string();
+                    print!("[{label}] {text}");
+                    append_log(&log_path, &format!("[{label}] {}", text.trim_end()));
                 }
                 CommandEvent::Stderr(line) => {
-                    eprint!("[{label}] {}", String::from_utf8_lossy(&line));
+                    let text = String::from_utf8_lossy(&line).to_string();
+                    eprint!("[{label}] {text}");
+                    append_log(&log_path, &format!("[{label}] {}", text.trim_end()));
+                }
+                CommandEvent::Error(err) => {
+                    append_log(&log_path, &format!("[{label}] ERROR: {err}"));
+                    app.state::<SidecarStatuses>().0.lock().unwrap().insert(
+                        label,
+                        SidecarStatus { running: false, last_exit_code: None, last_error: Some(err) },
+                    );
+                }
+                CommandEvent::Terminated(payload) => {
+                    append_log(
+                        &log_path,
+                        &format!(
+                            "[{label}] process exited (code={:?}, signal={:?})",
+                            payload.code, payload.signal
+                        ),
+                    );
+                    let statuses_state = app.state::<SidecarStatuses>();
+                    let mut statuses = statuses_state.0.lock().unwrap();
+                    let status = statuses.entry(label).or_insert_with(SidecarStatus::default);
+                    status.running = false;
+                    status.last_exit_code = payload.code;
                 }
                 _ => {}
             }
@@ -96,7 +196,28 @@ fn spawn_server<R: tauri::Runtime>(
         .env("HOST", "127.0.0.1")
         .env("PORT", config.port.to_string())
         .spawn()?;
-    pipe_sidecar_output("server", rx);
+    pipe_sidecar_output(app.clone(), "server", rx);
+    Ok(child)
+}
+
+/// Spawns the bundled inference sidecar (see scripts/bundle-inference.mjs).
+/// Shared by `setup()` (first launch) and `restart_inference` (manual
+/// restart from the Developer tab after a crash).
+fn spawn_inference<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    config: &InferenceConfig,
+) -> Result<CommandChild, tauri_plugin_shell::Error> {
+    let (rx, child) = app
+        .shell()
+        .command(config.entry.clone())
+        .env("INFERENCE_MOCK", "false")
+        .env(
+            "MODEL_CACHE_DIR",
+            config.model_cache_dir.to_string_lossy().to_string(),
+        )
+        .env("PORT", config.port.to_string())
+        .spawn()?;
+    pipe_sidecar_output(app.clone(), "inference", rx);
     Ok(child)
 }
 
@@ -110,6 +231,22 @@ fn get_backend_url(state: tauri::State<BackendUrl>) -> Result<String, String> {
         .ok_or_else(|| "backend not ready yet".to_string())
 }
 
+/// Kills the current server sidecar (if any) and respawns it against
+/// `watch_dir`, same port. Shared by `set_watch_dir` (new folder) and
+/// `restart_server` (same folder, e.g. recovering from a crash).
+fn restart_server_sidecar(app: &tauri::AppHandle, watch_dir: &Path) -> Result<(), String> {
+    if let Some(child) = app.state::<ServerProcess>().0.lock().unwrap().take() {
+        let _ = child.kill();
+    }
+
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+    let config = app.state::<ServerConfig>();
+    let child = spawn_server(app, &resource_dir, &config, watch_dir).map_err(|e| e.to_string())?;
+    app.state::<ServerProcess>().0.lock().unwrap().replace(child);
+
+    Ok(())
+}
+
 /// Restarts the server sidecar pointed at a new watch folder (e.g. after the
 /// user picks one via a native folder dialog on the frontend). The server has
 /// no API to change its watch directory at runtime, so this kills and
@@ -118,16 +255,32 @@ fn get_backend_url(state: tauri::State<BackendUrl>) -> Result<String, String> {
 fn set_watch_dir(app: tauri::AppHandle, new_dir: String) -> Result<(), String> {
     let watch_dir = PathBuf::from(new_dir);
     std::fs::create_dir_all(&watch_dir).map_err(|e| e.to_string())?;
+    restart_server_sidecar(&app, &watch_dir)?;
+    *app.state::<CurrentWatchDir>().0.lock().unwrap() = watch_dir;
+    Ok(())
+}
 
-    if let Some(child) = app.state::<ServerProcess>().0.lock().unwrap().take() {
+/// Lets the Developer tab recover from a crashed/hung server sidecar without
+/// relaunching the whole app -- respawns against whatever folder it was
+/// already watching.
+#[tauri::command]
+fn restart_server(app: tauri::AppHandle) -> Result<(), String> {
+    let watch_dir = app.state::<CurrentWatchDir>().0.lock().unwrap().clone();
+    restart_server_sidecar(&app, &watch_dir)
+}
+
+/// Lets the Developer tab recover from a crashed inference sidecar (the
+/// scenario this whole command exists for: a packaged build where inference
+/// died and there's no console to see why, but the Developer tab's log
+/// viewer at least explains it and this gets it running again).
+#[tauri::command]
+fn restart_inference(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(child) = app.state::<InferenceProcess>().0.lock().unwrap().take() {
         let _ = child.kill();
     }
-
-    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
-    let config = app.state::<ServerConfig>();
-    let child = spawn_server(&app, &resource_dir, &config, &watch_dir).map_err(|e| e.to_string())?;
-    app.state::<ServerProcess>().0.lock().unwrap().replace(child);
-
+    let config = app.state::<InferenceConfig>();
+    let child = spawn_inference(&app, &config).map_err(|e| e.to_string())?;
+    app.state::<InferenceProcess>().0.lock().unwrap().replace(child);
     Ok(())
 }
 
@@ -165,6 +318,74 @@ fn reveal_in_file_manager(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Opens `path` directly (unlike `reveal_in_file_manager`, which selects a
+/// file within its parent) -- used by the "import photos" popup shown after
+/// creating an event, so the user lands inside the event's folder ready to
+/// drop files in.
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SidecarStatusesPayload {
+    server: SidecarStatus,
+    inference: SidecarStatus,
+}
+
+/// Lets the Developer tab show "inference crashed (exit code 1)" instead of
+/// just "down", since `GET /developer/stats`'s health check can't tell a slow
+/// sidecar from one that already died.
+#[tauri::command]
+fn get_sidecar_status(state: tauri::State<SidecarStatuses>) -> SidecarStatusesPayload {
+    let statuses = state.0.lock().unwrap();
+    SidecarStatusesPayload {
+        server: statuses.get("server").cloned().unwrap_or_default(),
+        inference: statuses.get("inference").cloned().unwrap_or_default(),
+    }
+}
+
+/// Returns the last `lines` (default 200) of the combined sidecar log file,
+/// oldest first, for an in-app log viewer -- there's no console attached to a
+/// packaged GUI app to read this from otherwise.
+#[tauri::command]
+fn get_sidecar_logs(state: tauri::State<LogFilePath>, lines: Option<usize>) -> String {
+    let take = lines.unwrap_or(200);
+    let content = std::fs::read_to_string(&state.0).unwrap_or_default();
+    let tail: Vec<&str> = content.lines().rev().take(take).collect();
+    tail.into_iter().rev().collect::<Vec<_>>().join("\n")
+}
+
+#[tauri::command]
+fn get_log_file_path(state: tauri::State<LogFilePath>) -> String {
+    state.0.to_string_lossy().to_string()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -176,10 +397,23 @@ pub fn run() {
         .manage(ServerProcess(Mutex::new(None)))
         .manage(InferenceProcess(Mutex::new(None)))
         .manage(BackendUrl(Mutex::new(None)))
+        .manage(SidecarStatuses(Mutex::new(HashMap::from([
+            ("server", SidecarStatus::default()),
+            ("inference", SidecarStatus::default()),
+        ]))))
         .setup(|app| {
+            APP_START.set(Instant::now()).ok();
+
+            let log_dir = app.path().app_log_dir()?;
+            std::fs::create_dir_all(&log_dir)?;
+            app.manage(LogFilePath(log_dir.join("sidecars.log")));
+
             let app_data_dir = app.path().app_data_dir()?;
             let db_dir = app_data_dir.join("db");
-            let watch_dir = app_data_dir.join("incoming");
+            // Under Documents rather than the hidden app-data folder so a
+            // photographer can actually find it in Explorer/Finder to drop
+            // photos in manually, not just rely on the automatic pipeline.
+            let watch_dir = app.path().document_dir()?.join("SearchIt").join("incoming");
             let preview_dir = app_data_dir.join("previews");
             let face_thumbnail_dir = app_data_dir.join("face-thumbnails");
             let model_cache_dir = app_data_dir.join("models");
@@ -193,6 +427,8 @@ pub fn run() {
             ] {
                 std::fs::create_dir_all(dir)?;
             }
+
+            app.manage(CurrentWatchDir(Mutex::new(watch_dir.clone())));
 
             let resource_dir = app.path().resource_dir()?;
             let server_port = find_free_port(3001);
@@ -230,23 +466,19 @@ pub fn run() {
                 "searchit-inference{}",
                 std::env::consts::EXE_SUFFIX
             ));
-            let (inference_rx, inference_child) = app
-                .shell()
-                .command(inference_entry)
-                .env("INFERENCE_MOCK", "false")
-                .env(
-                    "MODEL_CACHE_DIR",
-                    model_cache_dir.to_string_lossy().to_string(),
-                )
-                .env("PORT", inference_port.to_string())
-                .spawn()
+            let inference_config = InferenceConfig {
+                entry: inference_entry,
+                model_cache_dir,
+                port: inference_port,
+            };
+            let inference_child = spawn_inference(&app.handle(), &inference_config)
                 .expect("failed to spawn bundled inference sidecar");
-            pipe_sidecar_output("inference", inference_rx);
             app.state::<InferenceProcess>()
                 .0
                 .lock()
                 .unwrap()
                 .replace(inference_child);
+            app.manage(inference_config);
 
             let backend_url = format!("http://127.0.0.1:{server_port}");
             app.state::<BackendUrl>()
@@ -276,8 +508,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             reveal_in_file_manager,
+            open_folder,
             get_backend_url,
-            set_watch_dir
+            set_watch_dir,
+            get_sidecar_status,
+            get_sidecar_logs,
+            get_log_file_path,
+            restart_server,
+            restart_inference
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

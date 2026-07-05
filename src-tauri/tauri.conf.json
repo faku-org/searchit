@@ -1,10 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "searchit",
-  "version": "0.2.0",
+  "productName": "SearchIt",
+  "version": "0.3.0",
   "identifier": "com.father.searchit",
   "build": {
-    "beforeDevCommand": "bun run bundle:server && bun run bundle:inference && bun run dev",
+    "beforeDevCommand": "bun scripts/kill-orphans.mjs 1420 bun-server searchit-inference searchit && bun run bundle:server && bun run bundle:inference && bun run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run bundle:server && bun run bundle:inference && bun run build",
     "frontendDist": "../dist"
@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "searchit",
-        "width": 800,
-        "height": 600,
+        "title": "SearchIt",
+        "width": 1200,
+        "height": 800,
         "visible": false,
         "decorations": false
       }

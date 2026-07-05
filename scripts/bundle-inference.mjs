@@ -54,7 +54,15 @@ function run(cmd, opts = {}) {
 }
 
 console.log("Syncing inference build environment...");
-run(["uv", "sync"], {
+// The `directml` extra replaces the base `onnxruntime` package (same import
+// name -- see pyproject.toml), so it must be requested explicitly on
+// Windows or the bundled build silently loses GPU acceleration. Omitting it
+// here previously let the persistent .build-venv drift between "has
+// onnxruntime-directml" (from some earlier manual install) and "just
+// onnxruntime" (this sync's default), and switching between same-named
+// packages in place is what corrupted the onnxruntime module for
+// PyInstaller's own import probe.
+run(["uv", "sync", ...(isWindows ? ["--extra", "directml"] : [])], {
   cwd: inferenceDir,
   env: { ...process.env, UV_PROJECT_ENVIRONMENT: buildVenvDir },
 });
