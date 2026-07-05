@@ -3,6 +3,7 @@ import type {
   BoundingBox,
   ConfigResponseBody,
   CreateEventRequestBody,
+  CreateEventResponseBody,
   CreateLocationRequestBody,
   DeveloperStatsResponseBody,
   EventSummary,
@@ -12,6 +13,7 @@ import type {
   MatchFaceResponseBody,
   PhotoDetail,
   PhotoSummary,
+  RetryAllPhotosResponseBody,
   RetryPhotoResponseBody,
   SearchFilters,
   SelectRegionAction,
@@ -80,7 +82,7 @@ export function getEvents(): Promise<EventSummary[]> {
 
 export function createEvent(
   body: CreateEventRequestBody,
-): Promise<EventSummary> {
+): Promise<CreateEventResponseBody> {
   return apiJsonRequest("POST", "/events", body);
 }
 
@@ -166,4 +168,8 @@ export function getFailedPhotos(): Promise<FailedPhotoSummary[]> {
 
 export function retryFailedPhoto(id: string): Promise<RetryPhotoResponseBody> {
   return apiJsonRequest("POST", `/developer/failed-photos/${id}/retry`);
+}
+
+export function retryAllFailedPhotos(): Promise<RetryAllPhotosResponseBody> {
+  return apiJsonRequest("POST", "/developer/failed-photos/retry-all");
 }

@@ -1,8 +1,15 @@
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { desc } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import type { EventSummary } from "@searchit/shared";
+import type { CreateEventResponseBody, EventSummary } from "@searchit/shared";
 import { db } from "../db/client";
 import { events } from "../db/schema";
+
+// Recomputed from env here rather than imported from index.ts, same pattern
+// as PREVIEW_DIR in routes/developer.ts -- index.ts already validated this is
+// set at boot.
+const WATCH_DIR = path.resolve(process.env.SEARCHIT_WATCH_DIR ?? "");
 
 function slugify(name: string): string {
   return (
@@ -30,7 +37,7 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
   })
   .post(
     "/",
-    async ({ body, set }) => {
+    async ({ body, set }): Promise<CreateEventResponseBody | { error: string }> => {
       const slug = body.slug ? slugify(body.slug) : slugify(body.name);
 
       try {
@@ -48,13 +55,20 @@ export const eventsRoutes = new Elysia({ prefix: "/events" })
           return { error: "Failed to create event" };
         }
 
-        const response: EventSummary = {
+        // The watcher already scopes ingest by "immediate subfolder name under
+        // the watch dir" (see ingest/watcher.ts), so creating this folder now
+        // means dropping files into it just works -- no need to know the slug
+        // or create the folder by hand.
+        const folderPath = path.join(WATCH_DIR, created.slug);
+        await mkdir(folderPath, { recursive: true });
+
+        return {
           id: created.id,
           name: created.name,
           slug: created.slug,
           startsAt: created.startsAt ? created.startsAt.toISOString() : null,
+          folderPath,
         };
-        return response;
       } catch {
         set.status = 409;
         return { error: `An event with slug "${slug}" already exists` };
