@@ -196,3 +196,7 @@ export interface RetryAllPhotosResponseBody {
   attempted: number;
   succeeded: number;
 }
+
+export interface ClearFailedPhotosResponseBody {
+  deleted: number;
+}

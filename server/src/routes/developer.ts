@@ -1,7 +1,9 @@
+import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type {
+  ClearFailedPhotosResponseBody,
   DeveloperStatsResponseBody,
   FailedPhotoSummary,
   RetryAllPhotosResponseBody,
@@ -174,4 +176,24 @@ export const developerRoutes = new Elysia({ prefix: "/developer" })
     }
 
     return { attempted: rows.length, succeeded };
+  })
+  .delete("/failed-photos", async (): Promise<ClearFailedPhotosResponseBody> => {
+    const rows = await db
+      .select({ id: photos.id, previewPath: photos.previewPath })
+      .from(photos)
+      .where(eq(photos.status, "failed"));
+
+    // Best-effort: most failed rows never got far enough to have a preview
+    // (e.g. the original file itself was unreadable), but clean up any that
+    // did rather than leaving orphaned files behind.
+    await Promise.all(
+      rows
+        .filter((row): row is { id: string; previewPath: string } => row.previewPath !== null)
+        .map((row) => unlink(row.previewPath).catch(() => {})),
+    );
+
+    // faceEmbeddings/imageEmbeddings rows cascade on delete (see schema.ts).
+    await db.delete(photos).where(eq(photos.status, "failed"));
+
+    return { deleted: rows.length };
   });

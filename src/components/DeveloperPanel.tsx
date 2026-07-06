@@ -9,10 +9,12 @@ import {
   type LucideIcon,
   RefreshCw,
   RotateCw,
+  Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
 import type { DeveloperStatsResponseBody, FailedPhotoSummary } from "@searchit/shared";
 import {
+  clearFailedPhotos,
   getDeveloperStats,
   getFailedPhotos,
   retryAllFailedPhotos,
@@ -47,6 +49,7 @@ export function DeveloperPanel() {
   const [failedPhotos, setFailedPhotos] = useState<FailedPhotoSummary[]>([]);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [isRetryingAll, setIsRetryingAll] = useState(false);
+  const [isClearingFailed, setIsClearingFailed] = useState(false);
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatuses | null>(null);
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState("");
@@ -108,6 +111,23 @@ export function DeveloperPanel() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsRetryingAll(false);
+    }
+  }
+
+  async function handleClearFailed() {
+    const count = stats?.failedCount ?? failedPhotos.length;
+    if (!window.confirm(t("developer.clearFailedConfirm", { count }))) {
+      return;
+    }
+    setIsClearingFailed(true);
+    try {
+      const result = await clearFailedPhotos();
+      refresh({ silent: true });
+      showToast(t("developer.clearFailedResult", { deleted: result.deleted }), "success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsClearingFailed(false);
     }
   }
 
@@ -297,15 +317,26 @@ export function DeveloperPanel() {
               {t("developer.failedPhotos")}
             </h3>
             {failedPhotos.length > 0 && (
-              <button
-                type="button"
-                disabled={isRetryingAll}
-                onClick={() => void handleRetryAll()}
-                className={secondaryButton}
-              >
-                <RotateCw className={`h-3.5 w-3.5 ${isRetryingAll ? "animate-spin" : ""}`} />
-                {isRetryingAll ? t("developer.retryingAll") : t("developer.retryAll")}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={isRetryingAll}
+                  onClick={() => void handleRetryAll()}
+                  className={secondaryButton}
+                >
+                  <RotateCw className={`h-3.5 w-3.5 ${isRetryingAll ? "animate-spin" : ""}`} />
+                  {isRetryingAll ? t("developer.retryingAll") : t("developer.retryAll")}
+                </button>
+                <button
+                  type="button"
+                  disabled={isClearingFailed}
+                  onClick={() => void handleClearFailed()}
+                  className={secondaryButton}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {isClearingFailed ? t("developer.clearingFailed") : t("developer.clearFailed")}
+                </button>
+              </div>
             )}
           </div>
           {failedPhotos.length === 0 ? (

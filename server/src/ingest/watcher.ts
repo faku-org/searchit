@@ -39,12 +39,23 @@ export function startWatcher(
   previewDir: string,
   faceThumbnailDir: string,
 ): void {
-  watch(watchDir, { recursive: true }, (_eventType, filename) => {
-    if (!filename) return;
-    const fullPath = path.join(watchDir, filename.toString());
-    if (!SUPPORTED_EXTENSIONS.has(path.extname(fullPath).toLowerCase())) return;
-    queueFile(fullPath, watchDir, previewDir, faceThumbnailDir);
-  });
+  try {
+    const watcher = watch(watchDir, { recursive: true }, (_eventType, filename) => {
+      if (!filename) return;
+      const fullPath = path.join(watchDir, filename.toString());
+      if (!SUPPORTED_EXTENSIONS.has(path.extname(fullPath).toLowerCase())) return;
+      queueFile(fullPath, watchDir, previewDir, faceThumbnailDir);
+    });
+    // An unhandled "error" event (e.g. macOS denying access to watchDir)
+    // would otherwise crash the whole process -- existing photos stay
+    // searchable even if new ones can't be auto-detected, so this should
+    // degrade rather than take the server down.
+    watcher.on("error", (error) => {
+      console.error(`[watcher] lost watch on ${watchDir}, new photos won't be auto-detected:`, error);
+    });
+  } catch (error) {
+    console.error(`[watcher] failed to start watching ${watchDir}:`, error);
+  }
 
   void scanExisting(watchDir, previewDir, faceThumbnailDir);
 }

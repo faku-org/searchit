@@ -168,6 +168,70 @@ fn pipe_sidecar_output<R: tauri::Runtime>(
     });
 }
 
+/// Turns a permission failure on `dir` into an actionable message. macOS
+/// gates Desktop/Documents/Downloads/removable-volume access via TCC (see
+/// Info.plist's usage-description keys) and just returns `EPERM` with no
+/// dialog once a request has already been denied -- surface something the
+/// user can act on instead of a bare "Operation not permitted".
+fn describe_watch_dir_error(dir: &Path, err: &std::io::Error) -> String {
+    if err.kind() == std::io::ErrorKind::PermissionDenied {
+        #[cfg(target_os = "macos")]
+        {
+            format!(
+                "macOS blocked access to {}. Grant SearchIt access under System Settings \u{2192} Privacy & Security \u{2192} Files and Folders, then try again.",
+                dir.display()
+            )
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            format!("Permission denied accessing {}: {err}", dir.display())
+        }
+    } else {
+        format!("Could not access {}: {err}", dir.display())
+    }
+}
+
+/// Creates `dir` if needed and forces a real directory-content read on it.
+/// `create_dir_all` alone is a no-op when `dir` already exists (e.g. on a
+/// second launch), which never actually touches the folder's contents and so
+/// never gives macOS's TCC a chance to prompt -- the first *real* read would
+/// otherwise happen inside the `bun-server` sidecar, a separate process the
+/// OS may just silently deny without any dialog. Doing the read here, in the
+/// main process that owns Info.plist's usage-description strings, is what
+/// actually triggers (or re-surfaces) the consent prompt.
+fn ensure_watch_dir_accessible(dir: &Path) -> Result<(), String> {
+    reject_if_inside_photos_library(dir)?;
+    std::fs::create_dir_all(dir).map_err(|e| describe_watch_dir_error(dir, &e))?;
+    let mut entries = std::fs::read_dir(dir).map_err(|e| describe_watch_dir_error(dir, &e))?;
+    if let Some(first) = entries.next() {
+        first.map_err(|e| describe_watch_dir_error(dir, &e))?;
+    }
+    Ok(())
+}
+
+/// Rejects a watch folder that lives inside a macOS Photos Library bundle.
+/// Even with Files-and-Folders access granted, reading a `.photoslibrary`
+/// bundle's internals (e.g. `resources/derivatives/...`) is gated by a
+/// separate, PhotosKit-only TCC service that no Info.plist string or folder
+/// permission can satisfy for a plain filesystem-reading process like this
+/// one -- it will always come back EPERM. Failing fast here beats silently
+/// queuing thousands of un-retriable failed photos.
+fn reject_if_inside_photos_library(dir: &Path) -> Result<(), String> {
+    let inside_library = dir
+        .ancestors()
+        .any(|ancestor| ancestor.extension().is_some_and(|ext| ext == "photoslibrary"));
+    if inside_library {
+        return Err(
+            "That folder is inside a macOS Photos Library, which SearchIt can't read directly \
+-- macOS only allows that through the Photos app itself, not plain file access. Export or drag \
+the photos you want out of Photos into a regular folder, then point SearchIt at that folder \
+instead."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 /// Spawns the bundled server sidecar (see scripts/bundle-server.mjs) against
 /// `watch_dir`, piping its output and returning the child handle. Shared by
 /// `setup()` (first launch) and `set_watch_dir` (restart with a new folder).
@@ -254,7 +318,7 @@ fn restart_server_sidecar(app: &tauri::AppHandle, watch_dir: &Path) -> Result<()
 #[tauri::command]
 fn set_watch_dir(app: tauri::AppHandle, new_dir: String) -> Result<(), String> {
     let watch_dir = PathBuf::from(new_dir);
-    std::fs::create_dir_all(&watch_dir).map_err(|e| e.to_string())?;
+    ensure_watch_dir_accessible(&watch_dir)?;
     restart_server_sidecar(&app, &watch_dir)?;
     *app.state::<CurrentWatchDir>().0.lock().unwrap() = watch_dir;
     Ok(())
@@ -410,23 +474,36 @@ pub fn run() {
 
             let app_data_dir = app.path().app_data_dir()?;
             let db_dir = app_data_dir.join("db");
-            // Under Documents rather than the hidden app-data folder so a
-            // photographer can actually find it in Explorer/Finder to drop
-            // photos in manually, not just rely on the automatic pipeline.
-            let watch_dir = app.path().document_dir()?.join("SearchIt").join("incoming");
             let preview_dir = app_data_dir.join("previews");
             let face_thumbnail_dir = app_data_dir.join("face-thumbnails");
             let model_cache_dir = app_data_dir.join("models");
 
-            for dir in [
-                &db_dir,
-                &watch_dir,
-                &preview_dir,
-                &face_thumbnail_dir,
-                &model_cache_dir,
-            ] {
+            for dir in [&db_dir, &preview_dir, &face_thumbnail_dir, &model_cache_dir] {
                 std::fs::create_dir_all(dir)?;
             }
+
+            // Under Documents rather than the hidden app-data folder so a
+            // photographer can actually find it in Explorer/Finder to drop
+            // photos in manually, not just rely on the automatic pipeline.
+            // On macOS this is TCC-gated (see Info.plist) and the very first
+            // launch may hit that before the user has had a chance to grant
+            // it -- fall back to the app's own (never-gated) data dir rather
+            // than failing the whole app's startup over it; the user can
+            // point the watcher back at Documents from Settings once access
+            // is granted.
+            let default_watch_dir = app.path().document_dir()?.join("SearchIt").join("incoming");
+            let watch_dir = match ensure_watch_dir_accessible(&default_watch_dir) {
+                Ok(()) => default_watch_dir,
+                Err(err) => {
+                    let fallback = app_data_dir.join("incoming");
+                    std::fs::create_dir_all(&fallback)?;
+                    append_log(
+                        &log_dir.join("sidecars.log"),
+                        &format!("[setup] {err}; using {} instead", fallback.display()),
+                    );
+                    fallback
+                }
+            };
 
             app.manage(CurrentWatchDir(Mutex::new(watch_dir.clone())));
 

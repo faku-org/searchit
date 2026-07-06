@@ -1,6 +1,7 @@
 import type {
   BackfillResponseBody,
   BoundingBox,
+  ClearFailedPhotosResponseBody,
   ConfigResponseBody,
   CreateEventRequestBody,
   CreateEventResponseBody,
@@ -172,4 +173,8 @@ export function retryFailedPhoto(id: string): Promise<RetryPhotoResponseBody> {
 
 export function retryAllFailedPhotos(): Promise<RetryAllPhotosResponseBody> {
   return apiJsonRequest("POST", "/developer/failed-photos/retry-all");
+}
+
+export function clearFailedPhotos(): Promise<ClearFailedPhotosResponseBody> {
+  return apiJsonRequest("DELETE", "/developer/failed-photos");
 }
