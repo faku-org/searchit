@@ -1,7 +1,18 @@
 import { useRef, useState } from "react";
+import { AlertTriangle, ScanFace, Upload, X } from "lucide-react";
+import { motion } from "motion/react";
 import type { FaceMatchCandidate, IdentitySummary } from "@searchit/shared";
 import { matchFace, resolveApiUrl } from "../lib/api";
 import { useTranslation } from "../lib/i18n";
+import {
+  iconButton,
+  modalBackdrop,
+  modalPanel,
+  secondaryButton,
+  springTransition,
+  staggerContainer,
+  staggerItem,
+} from "../lib/theme";
 
 interface IdentifyByPhotoModalProps {
   onClose: () => void;
@@ -39,28 +50,32 @@ export function IdentifyByPhotoModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-6"
+    <motion.div
+      className={modalBackdrop}
       onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
-      <div
-        className="flex w-full max-w-md flex-col gap-3 rounded-lg bg-white p-4 dark:bg-neutral-900"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={springTransition}
+        className={`${modalPanel} max-w-md`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{t("identify.title")}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-          >
-            {t("common.close")}
+          <h2 className="flex items-center gap-2 font-serif text-lg font-semibold text-mist-100">
+            <ScanFace className="h-4 w-4 text-blue-400" />
+            {t("identify.title")}
+          </h2>
+          <button type="button" onClick={onClose} className={iconButton}>
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-          {t("identify.prompt")}
-        </p>
+        <p className="text-xs text-mist-500">{t("identify.prompt")}</p>
 
         <input
           ref={fileInputRef}
@@ -78,34 +93,39 @@ export function IdentifyByPhotoModal({
             <img
               src={filePreviewUrl}
               alt=""
-              className="h-16 w-16 rounded object-cover"
+              className="h-16 w-16 rounded-xl object-cover"
             />
           )}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+            className={secondaryButton}
           >
-            {filePreviewUrl
-              ? t("identify.anotherFile")
-              : t("identify.chooseFile")}
+            <Upload className="h-3.5 w-3.5" />
+            {filePreviewUrl ? t("identify.anotherFile") : t("identify.chooseFile")}
           </button>
         </div>
 
-        {isMatching && (
-          <p className="text-sm text-neutral-500">{t("identify.matching")}</p>
-        )}
+        {isMatching && <p className="text-sm text-mist-500">{t("identify.matching")}</p>}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        {candidates && candidates.length === 0 && !error && (
-          <p className="text-sm text-neutral-500">
-            {t("identify.noCandidates")}
+        {error && (
+          <p className="flex items-center gap-1.5 text-sm text-rose-400">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            {error}
           </p>
         )}
 
+        {candidates && candidates.length === 0 && !error && (
+          <p className="text-sm text-mist-500">{t("identify.noCandidates")}</p>
+        )}
+
         {candidates && candidates.length > 0 && (
-          <ul className="flex flex-col gap-2">
+          <motion.ul
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="flex flex-col gap-2"
+          >
             {candidates.map((candidate) => (
               <CandidateRow
                 key={candidate.identityId}
@@ -118,15 +138,13 @@ export function IdentifyByPhotoModal({
                     thumbnailUrl: candidate.thumbnailUrl,
                   })
                 }
-                onRename={(displayName) =>
-                  onRename(candidate.identityId, displayName)
-                }
+                onRename={(displayName) => onRename(candidate.identityId, displayName)}
               />
             ))}
-          </ul>
+          </motion.ul>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -149,34 +167,33 @@ function CandidateRow({
   );
 
   return (
-    <li className="flex items-center gap-3 rounded-md border border-neutral-200 p-2 dark:border-neutral-800">
+    <motion.li
+      variants={staggerItem}
+      className="flex items-center gap-3 rounded-2xl border border-navy-800 bg-navy-950/40 p-2"
+    >
       {candidate.thumbnailUrl && (
         <img
           src={resolveApiUrl(candidate.thumbnailUrl)}
           alt={t("photoDetail.detectedFace")}
-          className="h-12 w-12 rounded object-cover"
+          className="squircle h-12 w-12 object-cover"
         />
       )}
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex flex-1 flex-col gap-0.5">
         <input
           type="text"
           value={name}
           placeholder={t("people.unnamedPlaceholder")}
           onChange={(event) => setName(event.target.value)}
           onBlur={() => onRename(name.trim() || null)}
-          className="rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-neutral-900 hover:border-neutral-300 focus:border-neutral-400 dark:text-neutral-100 dark:hover:border-neutral-700"
+          className="rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-mist-100 outline-none hover:border-navy-700 focus:border-blue-500"
         />
-        <span className="px-1 text-xs text-neutral-500 dark:text-neutral-400">
+        <span className="px-1 text-xs text-mist-500">
           {t("identify.matchPercent", { percent: matchPercent })}
         </span>
       </div>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
-      >
+      <button type="button" onClick={onOpen} className={secondaryButton}>
         {t("identify.viewPhotos")}
       </button>
-    </li>
+    </motion.li>
   );
 }

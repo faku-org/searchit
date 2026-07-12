@@ -1,45 +1,64 @@
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CalendarPlus,
+  FolderOpen,
+  House,
+  Images,
+  Map as MapIcon,
+  MapPinPlus,
+  RefreshCw,
+  ScanFace,
+  Settings as SettingsIcon,
+  SlidersHorizontal,
+  Terminal,
+  Users,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type {
+  DeveloperStatsResponseBody,
   EventSummary,
   IdentitySummary,
   LocationSummary,
   PhotoSummary,
   SearchFilters,
+  UpdateEventRequestBody,
 } from "@searchit/shared";
 import "./App.css";
+import { DeveloperPanel } from "./components/DeveloperPanel";
+import { EventsPanel } from "./components/EventsPanel";
+import { HomeView } from "./components/HomeView";
 import { IdentifyByPhotoModal } from "./components/IdentifyByPhotoModal";
+import { ImportPhotosModal } from "./components/ImportPhotosModal";
 import { MapView } from "./components/MapView";
 import { NewEventModal } from "./components/NewEventModal";
 import { PeopleGrid } from "./components/PeopleGrid";
 import { PhotoDetailPanel } from "./components/PhotoDetailPanel";
 import { ResultsGrid } from "./components/ResultsGrid";
 import { SearchFiltersPanel } from "./components/SearchFiltersPanel";
+import { SettingsModal } from "./components/SettingsModal";
 import { TagLocationModal } from "./components/TagLocationModal";
+import { TitleBar } from "./components/TitleBar";
 import {
   backfillPhotos,
   createEvent,
   createLocation,
   getConfig,
+  getDeveloperStats,
   getEvents,
   getIdentities,
   getIdentityPhotos,
   getLocations,
   renameIdentity,
+  retryAllFailedPhotos,
   searchPhotos,
+  updateEvent,
 } from "./lib/api";
 import { useTranslation } from "./lib/i18n";
-import { getApiBaseUrl, setApiBaseUrl } from "./lib/settings";
-import {
-  getBackendUrl,
-  pickWatchFolder,
-  setWatchDir as setServerWatchDir,
-} from "./lib/tauri";
-import {
-  checkForUpdate,
-  installPendingUpdate,
-  type UpdateInfo,
-} from "./lib/updater";
+import { setApiBaseUrl } from "./lib/settings";
+import { getBackendUrl } from "./lib/tauri";
+import { iconButton, pill } from "./lib/theme";
+import { useToast } from "./lib/toast";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -48,29 +67,56 @@ interface SimilarityQuery {
   results: PhotoSummary[];
 }
 
+interface ImportPrompt {
+  eventName: string;
+  folderPath: string;
+}
+
 interface PendingLocation {
   lat: number;
   lon: number;
 }
 
-type Tab = "photos" | "people" | "map";
+type Tab = "home" | "photos" | "people" | "map" | "events" | "developer";
+
+const TABS: {
+  key: Tab;
+  labelKey:
+    | "nav.home"
+    | "nav.photos"
+    | "nav.people"
+    | "nav.map"
+    | "nav.events"
+    | "nav.developer";
+  icon: typeof Images;
+}[] = [
+  { key: "home", labelKey: "nav.home", icon: House },
+  { key: "photos", labelKey: "nav.photos", icon: Images },
+  { key: "people", labelKey: "nav.people", icon: Users },
+  { key: "map", labelKey: "nav.map", icon: MapIcon },
+  { key: "events", labelKey: "nav.events", icon: SlidersHorizontal },
+  { key: "developer", labelKey: "nav.developer", icon: Terminal },
+];
 
 function App() {
-  const { t, locale, setLocale } = useTranslation();
-  const [tab, setTab] = useState<Tab>("photos");
-  const [apiBaseUrlInput, setApiBaseUrlInput] = useState(getApiBaseUrl());
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const [tab, setTab] = useState<Tab>("home");
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [locations, setLocations] = useState<LocationSummary[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [photos, setPhotos] = useState<PhotoSummary[]>([]);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [showNewEventModal, setShowNewEventModal] = useState(false);
+  const [importPrompt, setImportPrompt] = useState<ImportPrompt | null>(null);
   const [showIdentifyModal, setShowIdentifyModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isTaggingLocation, setIsTaggingLocation] = useState(false);
   const [watchDir, setWatchDir] = useState<string | null>(null);
+  const [faceRecognitionEnabled, setFaceRecognitionEnabled] = useState(true);
+  const [visualSearchEnabled, setVisualSearchEnabled] = useState(true);
   const [pendingLocation, setPendingLocation] =
     useState<PendingLocation | null>(null);
 
@@ -81,13 +127,7 @@ function App() {
 
   const [similarityQuery, setSimilarityQuery] =
     useState<SimilarityQuery | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(
-    null,
-  );
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const [isBackendUrlResolved, setIsBackendUrlResolved] = useState(false);
 
   function refreshEvents(options?: { silent?: boolean }) {
@@ -117,7 +157,6 @@ function App() {
       .then((url) => {
         if (cancelled) return;
         setApiBaseUrl(url);
-        setApiBaseUrlInput(url);
       })
       .catch(() => {})
       .finally(() => {
@@ -137,9 +176,20 @@ function App() {
     refreshLocations();
     void runSearch();
     getConfig()
-      .then((config) => setWatchDir(config.watchDir))
+      .then((config) => {
+        setWatchDir(config.watchDir);
+        setFaceRecognitionEnabled(config.faceRecognitionEnabled);
+        setVisualSearchEnabled(config.visualSearchEnabled);
+      })
       .catch(() => setWatchDir(null));
   }, [isBackendUrlResolved]);
+
+  // Face recognition can be turned off while the People tab is open (e.g.
+  // from Settings) -- bounce back to Home rather than leaving the user on a
+  // tab whose nav button just disappeared.
+  useEffect(() => {
+    if (tab === "people" && !faceRecognitionEnabled) setTab("home");
+  }, [tab, faceRecognitionEnabled]);
 
   // The server ingests new photos in the background (folder watcher +
   // inference pipeline), and other clients may create events/locations at
@@ -153,6 +203,59 @@ function App() {
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [filters, similarityQuery]);
+
+  // Photos fail with a generic error when the inference sidecar is
+  // unreachable, which looks like a bug to a photographer who never opens the
+  // Developer tab. Poll for that specific condition regardless of which tab
+  // is open, explain it in plain language, and retry those photos as soon as
+  // inference responds again instead of leaving them stuck until someone
+  // notices and clicks "Retry all" manually.
+  const inferenceWasDownRef = useRef(false);
+
+  useEffect(() => {
+    if (!isBackendUrlResolved) return;
+
+    async function checkInferenceRecovery() {
+      let stats: DeveloperStatsResponseBody;
+      try {
+        stats = await getDeveloperStats();
+      } catch {
+        return;
+      }
+
+      if (stats.inferenceStatus === "down" && stats.failedCount > 0) {
+        if (!inferenceWasDownRef.current) {
+          inferenceWasDownRef.current = true;
+          showToast(t("developer.inferenceDownToast"), "error");
+        }
+        return;
+      }
+
+      if (stats.inferenceStatus === "ready" && inferenceWasDownRef.current) {
+        inferenceWasDownRef.current = false;
+        try {
+          const result = await retryAllFailedPhotos();
+          if (result.attempted > 0) {
+            showToast(
+              t(
+                result.attempted === 1
+                  ? "developer.inferenceRecoveredToastOne"
+                  : "developer.inferenceRecoveredToastOther",
+                { count: result.attempted },
+              ),
+              "success",
+            );
+          }
+        } catch {
+          // The Developer tab's manual "Retry all" button is still available.
+        }
+      }
+    }
+
+    void checkInferenceRecovery();
+    const id = setInterval(() => void checkInferenceRecovery(), POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isBackendUrlResolved]);
 
   // Photos keep arriving in the background while the app is open, so refresh
   // the roster each time the tab is opened rather than only once on mount,
@@ -172,18 +275,16 @@ function App() {
       });
   }
 
-  async function runSearch(options?: { silent?: boolean }) {
+  async function runSearch(options?: { silent?: boolean; filters?: SearchFilters }) {
     if (!options?.silent) {
       setIsLoading(true);
-      setError(null);
     }
     try {
-      const results = await searchPhotos(filters);
+      const results = await searchPhotos(options?.filters ?? filters);
       setPhotos(results);
-      if (!options?.silent) setError(null);
     } catch (err) {
       if (!options?.silent) {
-        setError(err instanceof Error ? err.message : String(err));
+        showToast(err instanceof Error ? err.message : String(err), "error");
       }
     } finally {
       if (!options?.silent) setIsLoading(false);
@@ -192,11 +293,10 @@ function App() {
 
   async function openIdentity(identity: IdentitySummary) {
     setSelectedIdentity(identity);
-    setError(null);
     try {
       setIdentityPhotos(await getIdentityPhotos(identity.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     }
   }
 
@@ -208,7 +308,7 @@ function App() {
       await renameIdentity(id, displayName);
       refreshIdentities();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     }
   }
 
@@ -219,8 +319,24 @@ function App() {
   }
 
   async function handleCreateEvent(body: Parameters<typeof createEvent>[0]) {
-    await createEvent(body);
+    const created = await createEvent(body);
     refreshEvents();
+
+    // Jump straight to the new (empty) event instead of leaving the user on
+    // whatever filter they had before -- there's nothing to see there yet.
+    const nextFilters = { ...filters, eventId: created.id };
+    setFilters(nextFilters);
+    setSimilarityQuery(null);
+    setTab("photos");
+    void runSearch({ filters: nextFilters });
+
+    setImportPrompt({ eventName: created.name, folderPath: created.folderPath });
+  }
+
+  async function handleUpdateEvent(id: string, body: UpdateEventRequestBody) {
+    const result = await updateEvent(id, body);
+    refreshEvents();
+    return result;
   }
 
   async function handleCreateLocation(
@@ -237,11 +353,9 @@ function App() {
   }
 
   async function handleBackfill() {
-    setError(null);
-    setStatusMessage(null);
     try {
       const { queued } = await backfillPhotos();
-      setStatusMessage(
+      showToast(
         queued > 0
           ? t(queued === 1 ? "backfill.queuedOne" : "backfill.queuedOther", {
               count: queued,
@@ -249,186 +363,144 @@ function App() {
           : t("backfill.nothing"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : String(err), "error");
     }
   }
 
-  async function handleCheckForUpdate() {
-    setIsCheckingUpdate(true);
-    setError(null);
-    setStatusMessage(null);
-    try {
-      const update = await checkForUpdate();
-      setAvailableUpdate(update);
-      if (!update) setStatusMessage(t("update.upToDate"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsCheckingUpdate(false);
-    }
+  function handleHomeSearch(query: string) {
+    setFilters((current) => ({ ...current, q: query }));
+    setSimilarityQuery(null);
+    setTab("photos");
   }
 
-  async function handleInstallUpdate() {
-    setIsInstallingUpdate(true);
-    setError(null);
-    try {
-      await installPendingUpdate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setIsInstallingUpdate(false);
-    }
+  function handleHomeAllPhotos() {
+    setFilters({});
+    setSimilarityQuery(null);
+    setTab("photos");
   }
 
-  async function handleChangeWatchDir() {
-    const picked = await pickWatchFolder();
-    if (!picked) return;
-    setError(null);
-    try {
-      await setServerWatchDir(picked);
-      setWatchDir(picked);
-    } catch {
-      setError(t("header.changeWatchDirError"));
-    }
+  function handleHomeSelectEvent(eventId: string) {
+    setFilters({ eventId });
+    setSimilarityQuery(null);
+    setTab("photos");
   }
 
   return (
-    <main className="flex h-screen flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+    <main className="flex h-screen flex-col bg-navy-950 font-sans text-mist-100">
+      <svg width="0" height="0" className="absolute" aria-hidden="true">
+        <defs>
+          <clipPath id="squircle-clip" clipPathUnits="objectBoundingBox">
+            <path d="M 1.0000 0.5000 L 0.9983 0.7214 L 0.9931 0.7912 L 0.9844 0.8405 L 0.9720 0.8789 L 0.9558 0.9100 L 0.9353 0.9353 L 0.9100 0.9558 L 0.8789 0.9720 L 0.8405 0.9844 L 0.7912 0.9931 L 0.7214 0.9983 L 0.5000 1.0000 L 0.2786 0.9983 L 0.2088 0.9931 L 0.1595 0.9844 L 0.1211 0.9720 L 0.0900 0.9558 L 0.0647 0.9353 L 0.0442 0.9100 L 0.0280 0.8789 L 0.0156 0.8405 L 0.0069 0.7912 L 0.0017 0.7214 L 0.0000 0.5000 L 0.0017 0.2786 L 0.0069 0.2088 L 0.0156 0.1595 L 0.0280 0.1211 L 0.0442 0.0900 L 0.0647 0.0647 L 0.0900 0.0442 L 0.1211 0.0280 L 0.1595 0.0156 L 0.2088 0.0069 L 0.2786 0.0017 L 0.5000 0.0000 L 0.7214 0.0017 L 0.7912 0.0069 L 0.8405 0.0156 L 0.8789 0.0280 L 0.9100 0.0442 L 0.9353 0.0647 L 0.9558 0.0900 L 0.9720 0.1211 L 0.9844 0.1595 L 0.9931 0.2088 L 0.9983 0.2786 L 1.0000 0.5000 Z" />
+          </clipPath>
+        </defs>
+      </svg>
+      <TitleBar />
+      <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-4">
-          <h1 className="text-sm font-semibold">SearchIt</h1>
-          <nav className="flex gap-1 text-sm">
-            <TabButton
-              active={tab === "photos"}
-              onClick={() => setTab("photos")}
-            >
-              {t("nav.photos")}
-            </TabButton>
-            <TabButton
-              active={tab === "people"}
-              onClick={() => {
-                setTab("people");
-                setSelectedIdentity(null);
-              }}
-            >
-              {t("nav.people")}
-            </TabButton>
-            <TabButton active={tab === "map"} onClick={() => setTab("map")}>
-              {t("nav.map")}
-            </TabButton>
+          <nav className="relative flex items-center gap-1 rounded-full border border-navy-800 bg-navy-900/60 p-1 text-sm">
+            {TABS.filter((tabDef) => tabDef.key !== "people" || faceRecognitionEnabled).map(
+              ({ key, labelKey, icon: Icon }) => {
+                const active = tab === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setTab(key);
+                      if (key === "people") setSelectedIdentity(null);
+                    }}
+                    className={`relative z-10 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      active ? "text-navy-950" : "text-mist-300 hover:text-mist-100"
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="tab-indicator"
+                        className="absolute inset-0 -z-10 rounded-full bg-blue-500"
+                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      />
+                    )}
+                    <Icon className="h-3.5 w-3.5" />
+                    {t(labelKey)}
+                  </button>
+                );
+              },
+            )}
           </nav>
         </div>
-        <div className="flex items-center gap-2 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-2">
           {tab === "map" && (
             <button
               type="button"
               onClick={() => setIsTaggingLocation((current) => !current)}
-              className={`rounded border px-2 py-1 ${
+              className={
                 isTaggingLocation
-                  ? "border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900"
-                  : "border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              }`}
+                  ? "inline-flex items-center gap-1.5 rounded-full bg-blue-500 px-3 py-1.5 text-xs font-semibold text-navy-950"
+                  : pill
+              }
             >
+              <MapPinPlus className="h-3.5 w-3.5" />
               {isTaggingLocation
                 ? t("header.tagLocationActive")
                 : t("header.tagLocation")}
             </button>
           )}
-          {tab === "people" && (
+          {tab === "people" && faceRecognitionEnabled && (
             <button
               type="button"
               onClick={() => setShowIdentifyModal(true)}
-              className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              className={pill}
             >
+              <ScanFace className="h-3.5 w-3.5" />
               {t("people.identifyByPhoto")}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowNewEventModal(true)}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
+          <button type="button" onClick={() => setShowNewEventModal(true)} className={pill}>
+            <CalendarPlus className="h-3.5 w-3.5" />
             {t("header.newEvent")}
           </button>
-          <button
-            type="button"
-            onClick={() => void handleBackfill()}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
+          <button type="button" onClick={() => void handleBackfill()} className={pill}>
+            <RefreshCw className="h-3.5 w-3.5" />
             {t("header.backfill")}
           </button>
           <button
             type="button"
-            disabled={isCheckingUpdate}
-            onClick={() => void handleCheckForUpdate()}
-            className="rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            onClick={() => setShowSettingsModal(true)}
+            className={pill}
           >
-            {isCheckingUpdate ? t("update.checking") : t("update.check")}
+            <SettingsIcon className="h-3.5 w-3.5" />
+            {t("header.settings")}
           </button>
-          <button
-            type="button"
-            onClick={() => setLocale(locale === "en" ? "es" : "en")}
-            title="Language / Idioma"
-            className="rounded border border-neutral-300 px-2 py-1 font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            {locale === "en" ? "ES" : "EN"}
-          </button>
-          <span>{t("header.server")}</span>
-          <input
-            type="text"
-            value={apiBaseUrlInput}
-            onChange={(event) => setApiBaseUrlInput(event.target.value)}
-            onBlur={() => setApiBaseUrl(apiBaseUrlInput)}
-            className="w-56 rounded border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
-          />
         </div>
       </header>
 
       {watchDir && (
-        <p className="flex items-center gap-2 truncate px-4 py-1 text-xs text-neutral-400 dark:text-neutral-600">
+        <p className="flex items-center gap-2 truncate border-b border-navy-900 px-4 py-1.5 text-xs text-mist-500">
+          <FolderOpen className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">
             {t("header.watchDir", { path: watchDir })}
           </span>
-          <button
-            type="button"
-            onClick={() => void handleChangeWatchDir()}
-            className="shrink-0 rounded border border-neutral-300 px-1.5 py-0.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            {t("header.changeWatchDir")}
-          </button>
         </p>
       )}
 
-      {error && <p className="px-4 py-2 text-sm text-red-600">{error}</p>}
-      {statusMessage && (
-        <p className="px-4 py-2 text-sm text-neutral-500">{statusMessage}</p>
-      )}
-      {availableUpdate && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm text-neutral-500">
-          <span>
-            {t("update.available", { version: availableUpdate.version })}
-          </span>
-          <button
-            type="button"
-            disabled={isInstallingUpdate}
-            onClick={() => void handleInstallUpdate()}
-            className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-          >
-            {isInstallingUpdate ? t("update.installing") : t("update.install")}
-          </button>
-        </div>
+      {tab === "home" && (
+        <HomeView
+          events={events}
+          onSearch={handleHomeSearch}
+          onAllPhotos={handleHomeAllPhotos}
+          onSelectEvent={handleHomeSelectEvent}
+        />
       )}
 
       {tab === "photos" &&
         (similarityQuery ? (
           <>
-            <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2 text-sm dark:border-neutral-800">
-              <span className="text-neutral-500">
-                {t("similarity.banner")}
-              </span>
+            <div className="flex items-center gap-2 border-b border-navy-800 px-4 py-2 text-sm">
+              <span className="text-mist-500">{t("similarity.banner")}</span>
               <button
                 type="button"
                 onClick={() => setSimilarityQuery(null)}
-                className="text-neutral-500 underline hover:text-neutral-800 dark:hover:text-neutral-200"
+                className="text-blue-400 underline hover:text-blue-300"
               >
                 {t("similarity.clear")}
               </button>
@@ -447,6 +519,7 @@ function App() {
               onChange={setFilters}
               onSubmit={() => void runSearch()}
               isLoading={isLoading}
+              visualSearchEnabled={visualSearchEnabled}
             />
             <ResultsGrid
               photos={photos}
@@ -458,15 +531,15 @@ function App() {
       {tab === "people" &&
         (selectedIdentity ? (
           <>
-            <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+            <div className="flex items-center gap-2 border-b border-navy-800 px-4 py-2">
               <button
                 type="button"
                 onClick={() => setSelectedIdentity(null)}
-                className="text-sm text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                className={iconButton}
               >
-                {t("people.back")}
+                <ArrowLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm font-medium">
+              <span className="font-serif text-sm font-medium text-mist-100">
                 {selectedIdentity.displayName ?? t("people.unnamedPerson")}
               </span>
             </div>
@@ -495,67 +568,73 @@ function App() {
         />
       )}
 
-      {showNewEventModal && (
-        <NewEventModal
-          onClose={() => setShowNewEventModal(false)}
-          onCreate={handleCreateEvent}
-        />
+      {tab === "events" && <EventsPanel events={events} onUpdate={handleUpdateEvent} />}
+
+      {tab === "developer" && (
+        <DeveloperPanel onSelectPhoto={(photoId) => setSelectedPhotoId(photoId)} />
       )}
 
-      {showIdentifyModal && (
-        <IdentifyByPhotoModal
-          onClose={() => setShowIdentifyModal(false)}
-          onOpenIdentity={(identity) => {
-            setShowIdentifyModal(false);
-            void openIdentity(identity);
-          }}
-          onRename={(id, displayName) =>
-            void handleRenameIdentity(id, displayName)
-          }
-        />
-      )}
+      <AnimatePresence>
+        {showSettingsModal && (
+          <SettingsModal
+            onClose={() => setShowSettingsModal(false)}
+            onSettingsChanged={(settings) => {
+              setWatchDir(settings.currentWatchDir);
+              setFaceRecognitionEnabled(settings.faceRecognitionEnabled);
+              setVisualSearchEnabled(settings.visualSearchEnabled);
+            }}
+          />
+        )}
 
-      {pendingLocation && (
-        <TagLocationModal
-          initialLat={pendingLocation.lat}
-          initialLon={pendingLocation.lon}
-          onClose={() => setPendingLocation(null)}
-          onCreate={handleCreateLocation}
-        />
-      )}
+        {showNewEventModal && (
+          <NewEventModal
+            onClose={() => setShowNewEventModal(false)}
+            onCreate={handleCreateEvent}
+          />
+        )}
 
-      {selectedPhotoId && (
-        <PhotoDetailPanel
-          photoId={selectedPhotoId}
-          onClose={() => setSelectedPhotoId(null)}
-          onFindSimilar={handleFindSimilar}
-        />
-      )}
+        {importPrompt && (
+          <ImportPhotosModal
+            eventName={importPrompt.eventName}
+            folderPath={importPrompt.folderPath}
+            onClose={() => setImportPrompt(null)}
+          />
+        )}
+
+        {showIdentifyModal && (
+          <IdentifyByPhotoModal
+            onClose={() => setShowIdentifyModal(false)}
+            onOpenIdentity={(identity) => {
+              setShowIdentifyModal(false);
+              void openIdentity(identity);
+            }}
+            onRename={(id, displayName) =>
+              void handleRenameIdentity(id, displayName)
+            }
+          />
+        )}
+
+        {pendingLocation && (
+          <TagLocationModal
+            initialLat={pendingLocation.lat}
+            initialLon={pendingLocation.lon}
+            onClose={() => setPendingLocation(null)}
+            onCreate={handleCreateLocation}
+          />
+        )}
+
+        {selectedPhotoId && (
+          <PhotoDetailPanel
+            photoId={selectedPhotoId}
+            locations={locations}
+            onClose={() => setSelectedPhotoId(null)}
+            onFindSimilar={handleFindSimilar}
+            visualSearchEnabled={visualSearchEnabled}
+            faceRecognitionEnabled={faceRecognitionEnabled}
+          />
+        )}
+      </AnimatePresence>
     </main>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded px-3 py-1 ${
-        active
-          ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-          : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

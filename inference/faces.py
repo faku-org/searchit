@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from config import get_execution_providers, get_settings
+from gpu_lock import GPU_LOCK
 
 if TYPE_CHECKING:
     from PIL.Image import Image
@@ -39,6 +40,14 @@ def _load_app():
     return _app
 
 
+def warmup() -> None:
+    """Pays the one-time InsightFace model load (onnx downloads + DirectML
+    session prepare) at startup instead of on the first real request. Mirrors
+    clip_embed.warmup(); see that docstring for why."""
+    with GPU_LOCK:
+        _load_app()
+
+
 class FaceResult:
     __slots__ = ("bbox", "confidence", "embedding")
 
@@ -57,10 +66,11 @@ def detect_faces(image: "Image") -> list[FaceResult]:
     """Returns detected faces as (x, y, width, height) boxes with a 512-dim ArcFace embedding."""
     import numpy as np
 
-    app = _load_app()
     # insightface/onnxruntime expects BGR ndarrays (it's built on cv2 conventions).
     bgr = np.array(image.convert("RGB"))[:, :, ::-1]
-    faces = app.get(bgr)
+    with GPU_LOCK:
+        app = _load_app()
+        faces = app.get(bgr)
 
     results: list[FaceResult] = []
     for face in faces:

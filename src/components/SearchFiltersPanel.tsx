@@ -1,9 +1,24 @@
 import type { ReactNode } from "react";
+import {
+  CalendarDays,
+  ChevronDown,
+  Hash,
+  type LucideIcon,
+  MapPin,
+  Radar,
+  RefreshCw,
+  Search,
+  Sparkles,
+  TextSearch,
+} from "lucide-react";
 import type { EventSummary, LocationSummary, SearchFilters } from "@searchit/shared";
 import { useTranslation } from "../lib/i18n";
+import { primaryButton, secondaryButton } from "../lib/theme";
 
-const inputClass =
-  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm text-neutral-900 outline-none focus:border-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+const fieldShellClass =
+  "flex items-center gap-2 rounded-full border border-navy-700 bg-navy-800 pl-3.5 pr-3 py-1.5";
+const bareInputClass =
+  "bg-transparent text-sm text-mist-100 outline-none placeholder:text-mist-500";
 
 interface SearchFiltersPanelProps {
   events: EventSummary[];
@@ -12,6 +27,8 @@ interface SearchFiltersPanelProps {
   onChange: (filters: SearchFilters) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  /** Whether CLIP-based visual/text search is enabled -- hides the "describe what you're looking for" field when off, since it has no embeddings to search against. */
+  visualSearchEnabled: boolean;
 }
 
 export function SearchFiltersPanel({
@@ -21,6 +38,7 @@ export function SearchFiltersPanel({
   onChange,
   onSubmit,
   isLoading,
+  visualSearchEnabled,
 }: SearchFiltersPanelProps) {
   const { t } = useTranslation();
 
@@ -33,13 +51,13 @@ export function SearchFiltersPanel({
 
   return (
     <form
-      className="flex flex-wrap items-end gap-3 border-b border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+      className="flex flex-wrap items-end gap-3 border border-navy-800 bg-navy-900/40 p-4 m-4 rounded-4xl"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <Field label={t("filters.photoId")}>
+      <Field icon={Hash} label={t("filters.photoId")}>
         <input
           type="text"
           value={filters.customId ?? ""}
@@ -47,63 +65,67 @@ export function SearchFiltersPanel({
             update("customId", event.target.value || undefined)
           }
           placeholder={t("photoDetail.idPlaceholder")}
-          className={inputClass}
+          className={`${bareInputClass} w-24`}
         />
       </Field>
 
-      <Field label={t("filters.event")}>
+      <SelectField icon={CalendarDays} label={t("filters.event")}>
         <select
           value={filters.eventId ?? ""}
           onChange={(event) =>
             update("eventId", event.target.value || undefined)
           }
-          className={inputClass}
+          className={`${bareInputClass} w-32 appearance-none pr-4`}
         >
-          <option value="">{t("filters.allEvents")}</option>
+          <option value="" className="bg-navy-800">
+            {t("filters.allEvents")}
+          </option>
           {events.map((event) => (
-            <option key={event.id} value={event.id}>
+            <option key={event.id} value={event.id} className="bg-navy-800">
               {event.name}
             </option>
           ))}
         </select>
-      </Field>
+      </SelectField>
 
-      <Field label={t("filters.from")}>
+      <Field icon={CalendarDays} label={t("filters.from")}>
         <input
           type="datetime-local"
           value={filters.from?.slice(0, 16) ?? ""}
           onChange={(event) => update("from", event.target.value || undefined)}
-          className={inputClass}
+          className={bareInputClass}
         />
       </Field>
 
-      <Field label={t("filters.to")}>
+      <Field icon={CalendarDays} label={t("filters.to")}>
         <input
           type="datetime-local"
           value={filters.to?.slice(0, 16) ?? ""}
           onChange={(event) => update("to", event.target.value || undefined)}
-          className={inputClass}
+          className={bareInputClass}
         />
       </Field>
 
-      <Field label={t("filters.location")}>
+      <SelectField icon={MapPin} label={t("filters.location")}>
         <select
           value={filters.locationId ?? ""}
           onChange={(event) =>
             update("locationId", event.target.value || undefined)
           }
-          className={inputClass}
+          className={`${bareInputClass} w-32 appearance-none pr-4`}
         >
-          <option value="">{t("filters.anywhere")}</option>
+          <option value="" className="bg-navy-800">
+            {t("filters.anywhere")}
+          </option>
           {locations.map((location) => (
-            <option key={location.id} value={location.id}>
+            <option key={location.id} value={location.id} className="bg-navy-800">
               {location.name}
             </option>
           ))}
         </select>
-      </Field>
+      </SelectField>
 
-      <Field label={t("filters.radius")}>
+      <Field icon={Radar} label={t("filters.radius")}>
         <input
           type="number"
           step="any"
@@ -115,23 +137,25 @@ export function SearchFiltersPanel({
               event.target.value ? Number(event.target.value) : undefined,
             )
           }
-          className={`${inputClass} w-24`}
+          className={`${bareInputClass} w-16`}
         />
       </Field>
 
-      <Field label={t("filters.describe")}>
-        <input
-          type="text"
-          value={filters.visualQuery ?? ""}
-          onChange={(event) =>
-            update("visualQuery", event.target.value || undefined)
-          }
-          placeholder={t("filters.describePlaceholder")}
-          className={`${inputClass} w-40`}
-        />
-      </Field>
+      {visualSearchEnabled && (
+        <Field icon={Sparkles} label={t("filters.describe")}>
+          <input
+            type="text"
+            value={filters.visualQuery ?? ""}
+            onChange={(event) =>
+              update("visualQuery", event.target.value || undefined)
+            }
+            placeholder={t("filters.describePlaceholder")}
+            className={`${bareInputClass} w-40`}
+          />
+        </Field>
+      )}
 
-      <Field label={t("filters.sceneText")}>
+      <Field icon={TextSearch} label={t("filters.sceneText")}>
         <input
           type="text"
           value={filters.sceneText ?? ""}
@@ -139,15 +163,12 @@ export function SearchFiltersPanel({
             update("sceneText", event.target.value || undefined)
           }
           placeholder={t("filters.sceneTextPlaceholder")}
-          className={`${inputClass} w-40`}
+          className={`${bareInputClass} w-40`}
         />
       </Field>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-      >
+      <button type="submit" disabled={isLoading} className={primaryButton}>
+        <Search className="h-3.5 w-3.5" />
         {isLoading ? t("filters.searching") : t("filters.search")}
       </button>
 
@@ -156,19 +177,52 @@ export function SearchFiltersPanel({
         disabled={isLoading}
         onClick={onSubmit}
         title={t("filters.refreshTitle")}
-        className="rounded-md border border-neutral-300 px-4 py-1.5 text-sm font-medium text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
+        className={secondaryButton}
       >
+        <RefreshCw className="h-3.5 w-3.5" />
         {t("filters.refresh")}
       </button>
     </form>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-      {label}
-      {children}
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium text-mist-500">{label}</span>
+      <span className={fieldShellClass}>
+        <Icon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+        {children}
+      </span>
+    </label>
+  );
+}
+
+function SelectField({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium text-mist-500">{label}</span>
+      <span className={`${fieldShellClass} relative`}>
+        <Icon className="h-3.5 w-3.5 shrink-0 text-mist-500" />
+        {children}
+        <ChevronDown className="pointer-events-none absolute right-3 h-3 w-3 text-mist-500" />
+      </span>
     </label>
   );
 }

@@ -7,17 +7,51 @@ export interface BoundingBox {
   height: number;
 }
 
+// Biases the ingest pipeline's OCR confidence floor and face-match distance
+// per event: "sports" leans on bib-number OCR over face identity, "vacation"/
+// "general" flip that, "custom" lets a specific event hand-tune both numbers
+// (see server/src/ingest/eventWeights.ts).
+export type EventCategory = "sports" | "vacation" | "general" | "custom";
+
+export interface EventWeights {
+  ocrMinConfidence: number;
+  faceMatchMaxDistance: number;
+}
+
 export interface EventSummary {
   id: string;
   name: string;
   slug: string;
   startsAt: string | null;
+  photoCount: number;
+  category: EventCategory;
+  customOcrMinConfidence: number | null;
+  customFaceMatchMaxDistance: number | null;
 }
 
 export interface CreateEventRequestBody {
   name: string;
   slug?: string;
   startsAt?: string;
+  category?: EventCategory;
+  customOcrMinConfidence?: number;
+  customFaceMatchMaxDistance?: number;
+}
+
+export interface CreateEventResponseBody extends EventSummary {
+  /** Watch-dir subfolder created for this event, for the "drop photos here" prompt. */
+  folderPath: string;
+}
+
+export interface UpdateEventRequestBody {
+  category: EventCategory;
+  customOcrMinConfidence?: number;
+  customFaceMatchMaxDistance?: number;
+}
+
+export interface UpdateEventResponseBody extends EventSummary {
+  /** Already-ingested photos in this event queued for reprocessing under the new weights. */
+  reprocessQueued: number;
 }
 
 export interface LocationSummary {
@@ -42,6 +76,8 @@ export interface PhotoSummary {
   gpsLon: number | null;
   status: PhotoStatus;
   customId: string | null;
+  width: number | null;
+  height: number | null;
 }
 
 export interface FaceDetection {
@@ -52,6 +88,8 @@ export interface FaceDetection {
   bbox: BoundingBox;
 }
 
+export type TakenAtSource = "exif" | "filesystem";
+
 export interface PhotoDetail extends PhotoSummary {
   originalPath: string;
   previewPath: string;
@@ -60,6 +98,9 @@ export interface PhotoDetail extends PhotoSummary {
   height: number | null;
   faces: FaceDetection[];
   recognizedText: string | null;
+  errorMessage: string | null;
+  takenAtSource: TakenAtSource | null;
+  hasImageEmbedding: boolean;
 }
 
 export interface UpdatePhotoRequestBody {
@@ -84,6 +125,8 @@ export interface SearchFilters {
   locationId?: string;
   visualQuery?: string;
   sceneText?: string;
+  /** Smart combined search: matches bib/ID, OCR text, filename, and (if none of those match) visual similarity. */
+  q?: string;
 }
 
 export interface DetectFacesRequestBody {
@@ -118,6 +161,7 @@ export interface EmbedTextResponseBody {
 
 export interface ReadSceneTextRequestBody {
   imagePath: string;
+  minConfidence?: number;
 }
 
 export interface ReadSceneTextResponseBody {
@@ -142,6 +186,38 @@ export interface BackfillResponseBody {
 export interface ConfigResponseBody {
   /** Absolute path the server watches for new photos to ingest. */
   watchDir: string;
+  /** Whether identity matching runs at all (see server/src/ingest/pipeline.ts). */
+  faceRecognitionEnabled: boolean;
+  /** Whether visual/text photo search runs at all (see server/src/ingest/pipeline.ts). */
+  visualSearchEnabled: boolean;
+}
+
+export interface StatsResponseBody {
+  total: number;
+  pending: number;
+  processed: number;
+  failed: number;
+  /** Currently running through the inference pipeline (bounded by ingest concurrency). */
+  active: number;
+  /** Waiting for a free worker slot. */
+  queued: number;
+}
+
+export interface DiagnosticsResponseBody {
+  watchDir: string;
+  previewDir: string;
+  faceThumbnailDir: string;
+  dbDir: string | null;
+  serverPort: number;
+  inferenceUrl: string;
+  inferenceHealthy: boolean;
+  ingestConcurrency: number;
+  /** "cuda"/"mps" means the DeepSeek-OCR-2 tier is selected by config+hardware; null means the fast OS-native tier is used. */
+  ocrActiveBackend: "cuda" | "mps" | null;
+  /** Whether the detected hardware clears the VRAM/unified-memory bar for DeepSeek-OCR-2, regardless of whether it's enabled. */
+  ocrHardwareCapable: boolean;
+  /** Whether the (~6.8GB) DeepSeek-OCR-2 weights have actually finished downloading and loading -- false even when ocrActiveBackend is set means it's selected but not loaded yet. */
+  ocrModelLoaded: boolean;
 }
 
 export interface FaceMatchCandidate {
@@ -155,4 +231,39 @@ export interface FaceMatchCandidate {
 
 export interface MatchFaceResponseBody {
   candidates: FaceMatchCandidate[];
+}
+
+export interface DeveloperStatsResponseBody {
+  /** Photos with status "processed". */
+  currentlyIndexed: number;
+  /** Pending photos not currently occupying a worker slot. */
+  queue: number;
+  /** Pending photos currently being processed (bounded by `workers`). */
+  processing: number;
+  /** Photos that finished processing in the last 10 minutes. */
+  indexedLastTenMinutes: number;
+  /** Max photos the ingest pipeline processes concurrently. */
+  workers: number;
+  inferenceStatus: "ready" | "down";
+  inferencePort: number | null;
+  serverStatus: "nominal";
+  serverPort: number;
+  /** Photos with status "failed", regardless of the /failed-photos list limit. */
+  failedCount: number;
+}
+
+export interface FailedPhotoSummary {
+  id: string;
+  filename: string;
+  errorMessage: string | null;
+}
+
+export interface RetryPhotoResponseBody {
+  id: string;
+  status: PhotoStatus;
+}
+
+export interface RetryAllPhotosResponseBody {
+  attempted: number;
+  succeeded: number;
 }

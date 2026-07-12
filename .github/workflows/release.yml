@@ -17,9 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-latest
-          - platform: macos-14
-    runs-on: ${{ matrix.platform }}
+          # Self-hosted (see "release" job below for why).
+          - runs-on: [self-hosted, vps-faku-org]
+          - runs-on: macos-14
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -56,12 +57,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: windows-latest
+          # Self-hosted VPS runner, not GitHub-hosted -- see AGENTS.md.
+          - runs-on: [self-hosted, vps-faku-org]
           # Apple Silicon only for now -- unsigned (no Apple Developer
           # account/notarization yet, see inference/README.md and AGENTS.md).
-          # Users open it once via right-click > Open to get past Gatekeeper.
-          - platform: macos-14
-    runs-on: ${{ matrix.platform }}
+          # With zero signature, Gatekeeper calls it "damaged" outright;
+          # users must run `xattr -cr /Applications/SearchIt.app` to open it.
+          - runs-on: macos-14
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
 

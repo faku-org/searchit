@@ -1,17 +1,77 @@
 from __future__ import annotations
 
+import logging
 import math
 import random
+import sys
+import threading
 import zlib
 from pathlib import Path
 
+import psutil
 from fastapi import FastAPI, HTTPException
 from PIL import Image, ImageStat
 from pydantic import BaseModel
 
-from config import get_execution_providers, get_settings
+import hardware
+from config import get_execution_providers, get_settings, resolve_ocr_backend
+
+logger = logging.getLogger("searchit.inference")
 
 app = FastAPI(title="SearchIt Inference")
+
+_process = psutil.Process()
+
+
+def _log_rss(tag: str) -> None:
+    """Logs this process's resident memory after a real (non-mock) inference
+    call, tagged by endpoint, so a batch run's console output shows which
+    endpoint's memory keeps climbing rather than just an overall total --
+    temporary diagnostics for tracking down a real-world memory leak."""
+    rss_mb = _process.memory_info().rss / (1024 * 1024)
+    logger.info("[memory] %s: rss=%.1fMB", tag, rss_mb)
+
+
+def _ocr_model_loaded() -> bool:
+    """Whether DeepSeek-OCR-2's weights have actually finished downloading
+    and loading into memory -- distinct from resolve_ocr_backend()'s
+    ocrActiveBackend, which only reflects whether the tier is *selected* by
+    config+hardware, not whether the (lazy, ~6.8GB) load has happened yet.
+    Reads ocr.py's module-level cache via sys.modules rather than importing
+    it directly: ocr.py pulls in torch/transformers at import time, and
+    /health needs to stay cheap for a client that never opted into this
+    tier at all."""
+    ocr_module = sys.modules.get("ocr")
+    return bool(ocr_module is not None and ocr_module._model is not None)
+
+
+def _warmup_models() -> None:
+    """Loads the real onnxruntime models (faces, then CLIP) once at startup,
+    off the request-handling threadpool, so the first retry-all batch doesn't
+    pay the multi-second load while holding GPU_LOCK and stalling every other
+    request behind it. Best-effort: on failure, the affected model just falls
+    back to its usual lazy load on first use."""
+    try:
+        from faces import warmup as warmup_faces
+
+        warmup_faces()
+    except Exception:
+        logger.exception("Face model warmup failed; will lazy-load on first request")
+
+    try:
+        from clip_embed import warmup as warmup_clip
+
+        warmup_clip()
+    except Exception:
+        logger.exception("CLIP model warmup failed; will lazy-load on first request")
+
+
+@app.on_event("startup")
+def _on_startup() -> None:
+    settings = get_settings()
+    if settings.inference_mock:
+        return
+    threading.Thread(target=_warmup_models, daemon=True).start()
 
 FACE_EMBEDDING_DIMENSIONS = 512
 MOCK_IDENTITY_CLUSTERS = 5
@@ -83,6 +143,10 @@ class EmbedTextResponse(BaseModel):
 
 class ReadSceneTextRequest(BaseModel):
     imagePath: str
+    # Drops low-score per-line OCR detections before joining them into the
+    # returned text -- see ocr_native.py's read_scene_text for which backends
+    # actually honor this.
+    minConfidence: float | None = None
 
 
 class ReadSceneTextResponse(BaseModel):
@@ -97,11 +161,30 @@ def health():
     # scripts/smoke-test-sidecars.mjs) confirm e.g. CoreML was really selected
     # on macOS rather than silently falling back to CPU.
     providers = [] if settings.inference_mock else get_execution_providers()
+    deepseek_device = None if settings.inference_mock else resolve_ocr_backend()
     return {
         "ok": True,
         "mock": settings.inference_mock,
         "device": settings.searchit_device,
         "providers": providers,
+        "ocrTier": settings.ocr_tier,
+        # The backend actually in effect right now (None means the native/
+        # ONNX tier), plus what the detector thinks this box could support if
+        # weights were configured -- lets the client show "your GPU supports
+        # the high-quality OCR tier" even before the user opts in.
+        "ocrActiveBackend": deepseek_device,
+        # False even while ocrActiveBackend is "cuda"/"mps" means the tier is
+        # selected but the weights haven't been downloaded/loaded yet --
+        # that happens lazily on the first photo actually OCR'd after
+        # enabling the setting, which can take a while for the ~6.8GB
+        # download.
+        "ocrModelLoaded": _ocr_model_loaded(),
+        "ocrCapability": {
+            "cuda": hardware.cuda_capable(),
+            "cudaVramGB": hardware.detect_nvidia_vram_gb(),
+            "mps": hardware.mps_capable(),
+            "macUnifiedMemoryGB": hardware.detect_mac_unified_memory_gb(),
+        },
     }
 
 
@@ -131,6 +214,7 @@ def embed_image_endpoint(body: EmbedImageRequest) -> EmbedImageResponse:
 
     with Image.open(image_path) as img:
         embedding = embed_image(img.convert("RGB"))
+    _log_rss("embed-image")
     return EmbedImageResponse(embedding=embedding)
 
 
@@ -146,20 +230,6 @@ def embed_text_endpoint(body: EmbedTextRequest) -> EmbedTextResponse:
     return EmbedTextResponse(embedding=embed_text(body.text))
 
 
-def _use_deepseek_ocr(settings) -> bool:
-    """DeepSeek-OCR-2 is the higher-quality tier, but it's torch+CUDA only
-    (see inference/README.md) -- only usable on a box with the `ml` extra
-    installed and a working NVIDIA GPU. Everywhere else (desktop client
-    machines) falls back to OS-native/ONNX OCR in ocr_native.py."""
-    if not settings.ocr_model_path:
-        return False
-    try:
-        import torch
-    except ImportError:
-        return False
-    return torch.cuda.is_available()
-
-
 @app.post("/read-scene-text", response_model=ReadSceneTextResponse)
 def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextResponse:
     settings = get_settings()
@@ -170,13 +240,22 @@ def read_scene_text_endpoint(body: ReadSceneTextRequest) -> ReadSceneTextRespons
     if settings.inference_mock:
         return ReadSceneTextResponse(text=_mock_scene_text(image_path))
 
-    if _use_deepseek_ocr(settings):
+    deepseek_device = resolve_ocr_backend()
+    if deepseek_device is not None:
         from ocr import read_scene_text
-    else:
-        from ocr_native import read_scene_text
+
+        with Image.open(image_path) as img:
+            text = read_scene_text(
+                img.convert("RGB"), min_confidence=body.minConfidence, device=deepseek_device
+            )
+        _log_rss("read-scene-text")
+        return ReadSceneTextResponse(text=text)
+
+    from ocr_native import read_scene_text
 
     with Image.open(image_path) as img:
-        text = read_scene_text(img.convert("RGB"))
+        text = read_scene_text(img.convert("RGB"), min_confidence=body.minConfidence)
+    _log_rss("read-scene-text")
     return ReadSceneTextResponse(text=text)
 
 
@@ -240,6 +319,7 @@ def _real_faces(image_path: Path) -> DetectFacesResponse:
         img = img.convert("RGB")
         results = detect_faces(img)
 
+    _log_rss("detect-faces")
     return DetectFacesResponse(
         faces=[
             FaceDetection(

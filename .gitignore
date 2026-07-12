@@ -31,7 +31,9 @@ inference/.build-venv
 inference/__pycache__
 inference/**/__pycache__
 inference/.ocr_scratch
+inference/.model_cache
 inference/*.pt
+inference/.model_cache
 data/
 *.env
 !*.env.example

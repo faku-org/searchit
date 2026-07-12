@@ -3,16 +3,25 @@ import type {
   BoundingBox,
   ConfigResponseBody,
   CreateEventRequestBody,
+  CreateEventResponseBody,
   CreateLocationRequestBody,
+  DeveloperStatsResponseBody,
+  DiagnosticsResponseBody,
   EventSummary,
+  FailedPhotoSummary,
   IdentitySummary,
   LocationSummary,
   MatchFaceResponseBody,
   PhotoDetail,
   PhotoSummary,
+  RetryAllPhotosResponseBody,
+  RetryPhotoResponseBody,
   SearchFilters,
   SelectRegionAction,
   SelectRegionResponseBody,
+  StatsResponseBody,
+  UpdateEventRequestBody,
+  UpdateEventResponseBody,
 } from "@searchit/shared";
 import { getApiBaseUrl } from "./settings";
 
@@ -67,6 +76,7 @@ export function searchPhotos(filters: SearchFilters): Promise<PhotoSummary[]> {
   if (filters.locationId) params.set("locationId", filters.locationId);
   if (filters.visualQuery) params.set("visualQuery", filters.visualQuery);
   if (filters.sceneText) params.set("sceneText", filters.sceneText);
+  if (filters.q) params.set("q", filters.q);
 
   return apiFetch<PhotoSummary[]>(`/search?${params.toString()}`);
 }
@@ -77,8 +87,15 @@ export function getEvents(): Promise<EventSummary[]> {
 
 export function createEvent(
   body: CreateEventRequestBody,
-): Promise<EventSummary> {
+): Promise<CreateEventResponseBody> {
   return apiJsonRequest("POST", "/events", body);
+}
+
+export function updateEvent(
+  id: string,
+  body: UpdateEventRequestBody,
+): Promise<UpdateEventResponseBody> {
+  return apiJsonRequest("PATCH", `/events/${id}`, body);
 }
 
 export function getLocations(): Promise<LocationSummary[]> {
@@ -151,4 +168,28 @@ export function selectRegion(
 
 export function backfillPhotos(): Promise<BackfillResponseBody> {
   return apiJsonRequest("POST", "/photos/backfill");
+}
+
+export function getStats(): Promise<StatsResponseBody> {
+  return apiFetch<StatsResponseBody>("/stats");
+}
+
+export function getDiagnostics(): Promise<DiagnosticsResponseBody> {
+  return apiFetch<DiagnosticsResponseBody>("/diagnostics");
+}
+
+export function getDeveloperStats(): Promise<DeveloperStatsResponseBody> {
+  return apiFetch<DeveloperStatsResponseBody>("/developer/stats");
+}
+
+export function getFailedPhotos(): Promise<FailedPhotoSummary[]> {
+  return apiFetch<FailedPhotoSummary[]>("/developer/failed-photos");
+}
+
+export function retryFailedPhoto(id: string): Promise<RetryPhotoResponseBody> {
+  return apiJsonRequest("POST", `/developer/failed-photos/${id}/retry`);
+}
+
+export function retryAllFailedPhotos(): Promise<RetryAllPhotosResponseBody> {
+  return apiJsonRequest("POST", "/developer/failed-photos/retry-all");
 }

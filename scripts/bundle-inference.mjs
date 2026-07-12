@@ -54,10 +54,31 @@ function run(cmd, opts = {}) {
 }
 
 console.log("Syncing inference build environment...");
-run(["uv", "sync"], {
+const uvSyncEnv = { ...process.env, UV_PROJECT_ENVIRONMENT: buildVenvDir };
+// The `directml` extra replaces the base `onnxruntime` package (same import
+// name -- see pyproject.toml), so it must be requested explicitly on
+// Windows or the bundled build silently loses GPU acceleration. Omitting it
+// here previously let the persistent .build-venv drift between "has
+// onnxruntime-directml" (from some earlier manual install) and "just
+// onnxruntime" (this sync's default), and switching between same-named
+// packages in place is what corrupted the onnxruntime module for
+// PyInstaller's own import probe.
+run(["uv", "sync", ...(isWindows ? ["--extra", "directml"] : [])], {
   cwd: inferenceDir,
-  env: { ...process.env, UV_PROJECT_ENVIRONMENT: buildVenvDir },
+  env: uvSyncEnv,
 });
+if (isWindows) {
+  // insightface hard-depends on plain `onnxruntime` (CPU-only), which shares
+  // its import path with `onnxruntime-directml` -- `uv sync --extra directml`
+  // above installs both, and insightface's transitive requirement wins the
+  // shared `onnxruntime/` package directory, silently leaving the sidecar on
+  // CPU. Force-reinstalling the directml wheel last overwrites those files
+  // so it's what actually gets imported as `onnxruntime` at runtime.
+  run(
+    ["uv", "pip", "install", "--reinstall", "--no-deps", "onnxruntime-directml"],
+    { cwd: inferenceDir, env: uvSyncEnv },
+  );
+}
 run(["uv", "pip", "install", "--python", buildVenvDir, "pyinstaller"], {
   cwd: inferenceDir,
 });
@@ -95,6 +116,10 @@ run(
     workDir,
     "--collect-data",
     "insightface",
+    // ocr_native.py's default OCR tier on every platform but macOS -- bundle
+    // its ~32MB of ONNX weights the same way insightface's are, so it works
+    // offline from first launch instead of trying (and on a read-only
+    // install directory, failing) to download them at runtime.
     "--collect-data",
     "rapidocr",
     "--add-data",

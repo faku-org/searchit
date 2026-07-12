@@ -33,7 +33,7 @@ Python, or Bun install required on the end user's machine:
 
 ```bash
 bun install                 # installs root + server + packages/* workspaces
-bun dev                     # vite dev server (port 1420, Tauri-aware)
+bun dev                     # vite dev server (port 4420, Tauri-aware)
 bun run tauri dev           # launch the actual desktop window (autostarts both sidecars)
 bun run build               # tsc && vite build
 bun run tauri build         # produce installers (see release workflow below)
@@ -103,9 +103,22 @@ then does three independent things per photo — face detection + identity
 matching, CLIP image embedding, OCR scene text — each wrapped so one failing
 doesn't fail the others; a photo stays searchable by date/location/customId
 even if face matching or OCR errors out. Status moves `pending` →
-`processed`/`failed`. The same function is reused for manual reprocess and
-backfill (`routes/photos.ts`), so it always deletes any prior
-face/image-embedding rows first to stay idempotent.
+`processed`/`failed`, and `processedAt` is stamped on success (used by the
+Developer tab's "indexed in the last 10 minutes" stat).
+
+`reprocess.ts`'s `reprocessPhoto` is the shared post-insert flow (re-derive
+`takenAt` if still missing, regenerate the preview if missing, run the
+pipeline, update status/`processedAt`) — used by the watcher for brand-new
+files, the manual "reprocess" button, the Developer tab's failed-photo retry
+action, and "retry all failed". It runs exclusively per photo ID (`queue.ts`'s
+`runExclusive`) so those callers can't race `runInferencePipeline`'s
+delete-then-insert against each other. `queue.ts`'s `enqueue` bounds how many
+photos process at once (`INGEST_CONCURRENCY`, default 3) and exposes queue
+depth/active count, which is what makes the Developer tab's "Queue"/
+"Processing"/"Workers" stats and the Home tab's ingest progress bar real
+numbers instead of placeholders. The same `runInferencePipeline` is reused
+for manual reprocess and backfill (`routes/photos.ts`), so it always deletes
+any prior face/image-embedding rows first to stay idempotent.
 
 ### Identity matching (server/src/ingest/faceMatching.ts)
 
@@ -119,6 +132,20 @@ read-only — it ranks candidate identities instead of assigning one, via
 `loadIdentityDetails()` / `rankIdentitiesByFace()`, which both `GET /` and
 `/match-face` share.
 
+### Developer tab (server/src/routes/developer.ts)
+
+Backs the client's "Developer" tab: `GET /developer/stats` (indexed/queue/
+processing counts from `photos.status` and `queue.ts`'s `getQueueStats`,
+inference/server health+port), `GET /developer/failed-photos` (rows with
+`status = "failed"`), and `POST /developer/failed-photos/:id/retry` (calls
+`reprocessPhoto` again, so a photo that never got a preview the first time
+still gets one). The panel also pulls `GET /diagnostics` and
+`POST /photos/reprocess-failed` from `routes/stats.ts` (shared with the Home
+tab's ingest progress bar) for the config-path card and "retry all failed".
+Ports are re-derived from `PORT`/`INFERENCE_URL` env vars
+rather than imported from `index.ts`, matching the pattern already used for
+`FACE_THUMBNAIL_DIR` in `routes/photos.ts`.
+
 ### Search (server/src/routes/search.ts)
 
 Structured filters (event/date range/geo/customId) combine with either a
@@ -129,17 +156,44 @@ haversine distance filter in JS.
 
 ### Client (src/)
 
-`App.tsx` is the single state owner — tab (`photos`/`people`/`map`), filters,
-selected photo/identity, an in-progress "similarity query" (from a
-region-select "find similar"), pending new-location, etc. Every component
-under `src/components/` is presentational and talks back through callback
-props; all network access goes through `src/lib/api.ts`, a thin fetch wrapper
-against a **runtime-configurable** API base URL persisted in `localStorage`
-(`src/lib/settings.ts`). On launch, `App.tsx` overwrites it with the bundled
-server sidecar's actual dynamically-chosen port (via the `get_backend_url`
-Tauri command) before making any API call; the manual override in the header
-input remains for the power-user case of pointing at a different machine's
-server instead of the local bundled one.
+`App.tsx` is the single state owner — tab (`home`/`photos`/`people`/`map`/
+`developer`), filters, selected photo/identity, an in-progress "similarity
+query" (from a region-select "find similar"), pending new-location, etc.
+Every component under `src/components/` is presentational and talks back
+through callback props; all network access goes through `src/lib/api.ts`, a
+thin fetch wrapper against a **runtime-configurable** API base URL persisted
+in `localStorage` (`src/lib/settings.ts`). On launch, `App.tsx` overwrites it
+with the bundled server sidecar's actual dynamically-chosen port (via the
+`get_backend_url` Tauri command) before making any API call; the manual
+override in the header input remains for the power-user case of pointing at
+a different machine's server instead of the local bundled one.
+
+The UI is a single dark navy/blue theme (no light mode) driven by the
+`@theme` tokens in `src/App.css` (brand colors `#0F2854`/`#1C4D8D`/`#4988C4`/
+`#BDE8F5` extended into a full scale) plus shared class fragments in
+`src/lib/theme.ts` -- reuse those tokens/fragments for any new UI rather than
+hardcoding colors. Icons are `lucide-react`, fonts are self-hosted IBM Plex
+Serif (headings) / IBM Plex Sans (body) via `@fontsource/*`, and
+`motion/react` (the `motion` package) drives the small transitions (tab
+indicator, modal enter/exit, grid stagger) — all three are real dependencies
+here, not aspirational.
+
+Two optional, model-download-dependent capabilities -- face recognition
+(identity matching) and visual/free-text photo search (CLIP) -- can be
+turned off from Settings (`SettingsModal.tsx`), persisted in
+`src-tauri`'s `AppSettings`/`settings.json` and passed to the server sidecar
+as `FACE_RECOGNITION_ENABLED`/`VISUAL_SEARCH_ENABLED` env vars (read in
+`server/src/ingest/pipeline.ts`, which then skips calling `/detect-faces` or
+`/embed-image` entirely -- so insightface/CLIP never even get downloaded on
+that machine). The client hides the People tab and the visual-search/
+face-linking controls accordingly (`App.tsx`'s `faceRecognitionEnabled`/
+`visualSearchEnabled` state, sourced from both the server's `/config` and
+the Tauri settings response). There's no macOS-native replacement for
+either: Apple's Vision framework has no public face-*recognition* embedding
+API (only detection), and its `VNGenerateImageFeaturePrintRequest` has no
+text encoder, so it can't power the free-text search CLIP's `embed_text()`
+does. OCR is the one capability that's already fully native on macOS/Windows
+with zero download (`inference/ocr_native.py`) -- see `inference/README.md`.
 
 Photos/events/locations/identities are kept fresh by silent polling
 (`POLL_INTERVAL_MS` in `App.tsx`, `PENDING_POLL_INTERVAL_MS` in
@@ -193,8 +247,11 @@ in `tauri.conf.json`, the check/install flow is `src/lib/updater.ts`, and
 release with a `latest.json` manifest on any `v*.*.*` tag push (the draft
 must be published manually before the updater endpoint will see it as
 "latest"). The release matrix covers Windows (signed) and macOS Apple Silicon
-(unsigned — no Apple Developer account/notarization yet; users open it once
-via right-click > Open to get past Gatekeeper).
+(unsigned — no Apple Developer account/notarization yet). Since it carries no
+signature at all, Gatekeeper on current macOS refuses it outright as
+"damaged" rather than offering the old right-click > Open override; users
+must manually clear the quarantine flag from Terminal instead:
+`xattr -cr /Applications/SearchIt.app`.
 
 ### Database
 

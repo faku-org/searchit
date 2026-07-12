@@ -1,25 +1,29 @@
 import { unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type {
   BackfillResponseBody,
   PhotoDetail,
   PhotoSummary,
   SelectRegionResponseBody,
+  TakenAtSource,
 } from "@searchit/shared";
 import { db } from "../db/client";
 import { faceEmbeddings, imageEmbeddings, photos } from "../db/schema";
 import { resolveIdentityForEmbedding } from "../ingest/faceMatching";
 import { saveFaceThumbnail } from "../ingest/faceThumbnail";
-import { runInferencePipeline } from "../ingest/pipeline";
+import { enqueue } from "../ingest/queue";
+import { reprocessPhoto } from "../ingest/reprocess";
 import { detectFaces, embedImage } from "../inference/client";
 import { cropToTempFile } from "../lib/imageCrop";
 import { cosineSimilarity } from "../lib/vector";
 
-// index.ts validates this env var is set and creates the directory at startup,
-// so by the time requests reach these routes it's safe to resolve again here.
+// index.ts validates these env vars are set and creates the directories at
+// startup, so by the time requests reach these routes it's safe to resolve
+// again here.
+const PREVIEW_DIR = path.resolve(process.env.SEARCHIT_PREVIEW_DIR ?? "");
 const FACE_THUMBNAIL_DIR = path.resolve(
   process.env.SEARCHIT_FACE_THUMBNAIL_DIR ?? "",
 );
@@ -41,6 +45,8 @@ async function rankBySimilarity(
       gpsLon: photos.gpsLon,
       status: photos.status,
       customId: photos.customId,
+      width: photos.width,
+      height: photos.height,
       embedding: imageEmbeddings.embedding,
     })
     .from(photos)
@@ -68,6 +74,8 @@ async function rankBySimilarity(
         gpsLon: row.gpsLon,
         status: row.status,
         customId: row.customId,
+        width: row.width,
+        height: row.height,
       }),
     );
 }
@@ -79,6 +87,14 @@ async function loadPhotoDetail(id: string): Promise<PhotoDetail | null> {
   });
 
   if (!photo) return null;
+
+  // No `imageEmbeddings` relation is declared on `photos` in schema.ts (it
+  // was added later, for backfill's left-join use), so this is queried
+  // separately rather than via `with`.
+  const imageEmbedding = await db.query.imageEmbeddings.findFirst({
+    where: (row, { eq }) => eq(row.photoId, id),
+    columns: { id: true },
+  });
 
   return {
     id: photo.id,
@@ -102,6 +118,9 @@ async function loadPhotoDetail(id: string): Promise<PhotoDetail | null> {
       bbox: face.bbox ?? { x: 0, y: 0, width: 0, height: 0 },
     })),
     recognizedText: photo.recognizedText,
+    errorMessage: photo.errorMessage,
+    takenAtSource: photo.takenAtSource as TakenAtSource | null,
+    hasImageEmbedding: imageEmbedding !== undefined,
   };
 }
 
@@ -166,12 +185,16 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
         set.status = 404;
         return { error: "Photo not found" };
       }
-      if (!photo.previewPath) {
-        set.status = 400;
-        return { error: "Photo has no preview yet, it may still be processing" };
-      }
 
-      await runInferencePipeline(photo.id, photo.previewPath, FACE_THUMBNAIL_DIR);
+      // Routed through the shared bounded queue so a manual reprocess can't
+      // pile on top of a live ingest batch and overload the inference
+      // sidecar. reprocessPhoto records status/errorMessage/processedAt on
+      // the row itself, so failures are surfaced via the returned detail
+      // rather than a 500 -- this call is only awaited to know when it's
+      // safe to read the fresh detail back.
+      await enqueue(() =>
+        reprocessPhoto(photo.id, PREVIEW_DIR, FACE_THUMBNAIL_DIR),
+      ).catch(() => {});
       return await loadPhotoDetail(photo.id);
     },
     { params: t.Object({ id: t.String() }) },
@@ -269,31 +292,35 @@ export const photosRoutes = new Elysia({ prefix: "/photos" })
     // Absence of an image_embeddings row reliably means "never touched by the
     // current full pipeline" (that table is always populated 1:1 once a photo
     // goes through it), which is exactly the class of photo ingested before a
-    // later phase (faces, CLIP) existed.
+    // later phase (faces, CLIP) existed. A null takenAt catches the same kind
+    // of "ingested before a later fix" photo for the EXIF/filesystem date
+    // fallback specifically -- reprocessPhoto re-derives it when missing.
     const candidates = await db
       .select({ id: photos.id, previewPath: photos.previewPath })
       .from(photos)
       .leftJoin(imageEmbeddings, eq(imageEmbeddings.photoId, photos.id))
-      .where(and(eq(photos.status, "processed"), isNull(imageEmbeddings.id)));
+      .where(
+        and(
+          eq(photos.status, "processed"),
+          or(isNull(imageEmbeddings.id), isNull(photos.takenAt)),
+        ),
+      );
 
     const reprocessable = candidates.filter(
       (candidate): candidate is { id: string; previewPath: string } =>
         candidate.previewPath !== null,
     );
 
-    void (async () => {
-      for (const candidate of reprocessable) {
-        try {
-          await runInferencePipeline(
-            candidate.id,
-            candidate.previewPath,
-            FACE_THUMBNAIL_DIR,
-          );
-        } catch (error) {
-          console.error(`[backfill] failed for photo ${candidate.id}:`, error);
-        }
-      }
-    })();
+    // Each candidate is enqueued independently (not awaited here) so they
+    // share the same bounded concurrency as live ingest and manual reprocess,
+    // instead of a separate unbounded loop racing the inference sidecar.
+    for (const candidate of reprocessable) {
+      enqueue(() =>
+        reprocessPhoto(candidate.id, PREVIEW_DIR, FACE_THUMBNAIL_DIR),
+      ).catch((error: unknown) => {
+        console.error(`[backfill] failed for photo ${candidate.id}:`, error);
+      });
+    }
 
     return { queued: reprocessable.length };
   });
