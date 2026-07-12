@@ -36,17 +36,33 @@ if (!WATCH_DIR_CONFIG || !PREVIEW_DIR_CONFIG || !FACE_THUMBNAIL_DIR_CONFIG) {
   );
 }
 
-// Resolved to absolute paths: Bun's recursive mkdir on Windows throws EEXIST
-// for a relative path (with `..` segments) that already exists, even though
-// recursive mkdir is supposed to be idempotent. Absolute paths sidestep it,
-// and are also unambiguous regardless of the process's cwd.
+// Resolved to absolute paths for consistency regardless of the process's cwd.
 const WATCH_DIR = path.resolve(WATCH_DIR_CONFIG);
 const PREVIEW_DIR = path.resolve(PREVIEW_DIR_CONFIG);
 const FACE_THUMBNAIL_DIR = path.resolve(FACE_THUMBNAIL_DIR_CONFIG);
 
-await mkdir(WATCH_DIR, { recursive: true });
-await mkdir(PREVIEW_DIR, { recursive: true });
-await mkdir(FACE_THUMBNAIL_DIR, { recursive: true });
+// Bun's recursive mkdir on Windows throws EEXIST instead of silently
+// succeeding when the target is one of the OS's well-known shell folders
+// (Pictures, Documents, Desktop, ...) -- those carry the FILE_ATTRIBUTE_READONLY
+// bit for Explorer's own bookkeeping (customized icon/localized name), which
+// trips Bun's existing-directory check even though the folder is perfectly
+// writable. WATCH_DIR defaults to the OS Pictures folder (see
+// src-tauri/src/lib.rs), so this hits on every default-config launch on
+// Windows -- the server crashed on startup and never bound to a port. A
+// plain app-owned directory (e.g. this repo's data/incoming used in dev)
+// never carries that attribute, which is why this only showed up against a
+// real watch folder.
+async function ensureDir(dir: string) {
+  try {
+    await mkdir(dir, { recursive: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+}
+
+await ensureDir(WATCH_DIR);
+await ensureDir(PREVIEW_DIR);
+await ensureDir(FACE_THUMBNAIL_DIR);
 
 // Self-initializes the schema on first boot -- a fresh device has no chance
 // to have run `db:migrate` by hand beforehand.
