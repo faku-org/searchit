@@ -36,6 +36,19 @@ struct AppSettings {
     face_recognition_enabled: bool,
     #[serde(default = "default_true")]
     visual_search_enabled: bool,
+    // Defaults false, unlike the two above: enabling this unlocks the
+    // DeepSeek-OCR-2 tier (inference/ocr.py) by setting OCR_MODEL_PATH for
+    // the inference sidecar, which triggers a one-time ~6.8GB weight
+    // download on the first photo actually OCR'd with it active -- opt-in
+    // matches inference/README.md's documented design, and avoids surprising
+    // a user with a multi-GB download or degraded battery/thermals on
+    // hardware that can't run it well. inference/config.py's "auto" tier
+    // still requires the detected hardware to look comfortably capable
+    // (>=8GB CUDA VRAM or >=16GB Mac unified memory, see hardware.py) before
+    // actually preferring it over the fast OS-native/ONNX tier, so this
+    // toggle only *unlocks the option* rather than forcing it.
+    #[serde(default)]
+    high_quality_ocr_enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -49,6 +62,7 @@ impl Default for AppSettings {
             last_watch_dir: None,
             face_recognition_enabled: true,
             visual_search_enabled: true,
+            high_quality_ocr_enabled: false,
         }
     }
 }
@@ -61,6 +75,7 @@ struct AppSettingsResponse {
     pictures_dir: String,
     face_recognition_enabled: bool,
     visual_search_enabled: bool,
+    high_quality_ocr_enabled: bool,
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -282,12 +297,14 @@ fn spawn_server<R: tauri::Runtime>(
 
 /// Spawns the bundled inference sidecar (see scripts/bundle-inference.mjs).
 /// Shared by `setup()` (first launch) and `restart_inference` (manual
-/// restart from the Developer tab after a crash).
+/// restart from the Developer tab after a crash, and `set_high_quality_ocr_enabled`
+/// picking up the new flag).
 fn spawn_inference<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     config: &InferenceConfig,
+    high_quality_ocr_enabled: bool,
 ) -> Result<CommandChild, tauri_plugin_shell::Error> {
-    let (rx, child) = app
+    let mut command = app
         .shell()
         .command(config.entry.clone())
         .env("INFERENCE_MOCK", "false")
@@ -295,8 +312,14 @@ fn spawn_inference<R: tauri::Runtime>(
             "MODEL_CACHE_DIR",
             config.model_cache_dir.to_string_lossy().to_string(),
         )
-        .env("PORT", config.port.to_string())
-        .spawn()?;
+        .env("PORT", config.port.to_string());
+    if high_quality_ocr_enabled {
+        // Only unlocks the option -- see AppSettings::high_quality_ocr_enabled's
+        // doc comment for why this doesn't force the tier regardless of
+        // detected hardware.
+        command = command.env("OCR_MODEL_PATH", "deepseek-ai/DeepSeek-OCR-2");
+    }
+    let (rx, child) = command.spawn()?;
     pipe_sidecar_output(app.clone(), "inference", rx);
     Ok(child)
 }
@@ -365,7 +388,9 @@ fn restart_inference(app: tauri::AppHandle) -> Result<(), String> {
         let _ = child.kill();
     }
     let config = app.state::<InferenceConfig>();
-    let child = spawn_inference(&app, &config).map_err(|e| e.to_string())?;
+    let settings = load_app_settings(&app);
+    let child = spawn_inference(&app, &config, settings.high_quality_ocr_enabled)
+        .map_err(|e| e.to_string())?;
     app.state::<InferenceProcess>().0.lock().unwrap().replace(child);
     Ok(())
 }
@@ -408,6 +433,7 @@ fn get_app_settings(app: tauri::AppHandle) -> Result<AppSettingsResponse, String
         pictures_dir: pictures_dir.to_string_lossy().to_string(),
         face_recognition_enabled: settings.face_recognition_enabled,
         visual_search_enabled: settings.visual_search_enabled,
+        high_quality_ocr_enabled: settings.high_quality_ocr_enabled,
     })
 }
 
@@ -472,6 +498,18 @@ fn set_visual_search_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(),
     save_app_settings(&app, &settings)?;
 
     restart_server_with_watch_dir(&app, current_watch_dir(&app)?)
+}
+
+/// Toggles the DeepSeek-OCR-2 tier on or off. Unlike the two toggles above,
+/// this is consumed by the *inference* sidecar (OCR_MODEL_PATH), not the
+/// server, so it restarts that sidecar instead of the server.
+#[tauri::command]
+fn set_high_quality_ocr_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = load_app_settings(&app);
+    settings.high_quality_ocr_enabled = enabled;
+    save_app_settings(&app, &settings)?;
+
+    restart_inference(app)
 }
 
 /// Opens the OS file manager with `path` selected, so the photographer can
@@ -689,8 +727,12 @@ pub fn run() {
                 model_cache_dir,
                 port: inference_port,
             };
-            let inference_child = spawn_inference(&app.handle(), &inference_config)
-                .expect("failed to spawn bundled inference sidecar");
+            let inference_child = spawn_inference(
+                &app.handle(),
+                &inference_config,
+                watch_settings.high_quality_ocr_enabled,
+            )
+            .expect("failed to spawn bundled inference sidecar");
             app.state::<InferenceProcess>()
                 .0
                 .lock()
@@ -733,6 +775,7 @@ pub fn run() {
             set_watch_dir_mode,
             set_face_recognition_enabled,
             set_visual_search_enabled,
+            set_high_quality_ocr_enabled,
             get_sidecar_status,
             get_sidecar_logs,
             get_log_file_path,

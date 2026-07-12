@@ -47,6 +47,8 @@ export interface AppSettings {
   faceRecognitionEnabled: boolean;
   /** Whether visual/text photo search runs at all -- off skips CLIP entirely, so its model is never downloaded. */
   visualSearchEnabled: boolean;
+  /** Whether the DeepSeek-OCR-2 tier is unlocked for scene-text OCR -- off (default) uses the fast OS-native tier. On, but only actually used on hardware the inference sidecar detects as comfortably capable; triggers a ~6.8GB download on the first photo OCR'd with it active. */
+  highQualityOcrEnabled: boolean;
 }
 
 export function getAppSettings(): Promise<AppSettings> {
@@ -66,6 +68,11 @@ export function setFaceRecognitionEnabled(enabled: boolean): Promise<void> {
 /** Toggles visual + free-text photo search (CLIP), restarting the server sidecar with the new flag. */
 export function setVisualSearchEnabled(enabled: boolean): Promise<void> {
   return invoke("set_visual_search_enabled", { enabled });
+}
+
+/** Toggles the DeepSeek-OCR-2 tier, restarting the inference sidecar with the new flag. */
+export function setHighQualityOcrEnabled(enabled: boolean): Promise<void> {
+  return invoke("set_high_quality_ocr_enabled", { enabled });
 }
 
 export interface SidecarStatus {

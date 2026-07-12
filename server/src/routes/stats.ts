@@ -4,7 +4,7 @@ import { Elysia } from "elysia";
 import type { DiagnosticsResponseBody, StatsResponseBody } from "@searchit/shared";
 import { db } from "../db/client";
 import { photos } from "../db/schema";
-import { checkInferenceHealth, INFERENCE_URL } from "../inference/client";
+import { checkInferenceHealth, getOcrStatus, INFERENCE_URL } from "../inference/client";
 import { getIngestConcurrency, getQueueStats } from "../ingest/queue";
 
 // index.ts validates these env vars are set and creates the directories at
@@ -46,6 +46,10 @@ export const statsRoutes = new Elysia()
     };
   })
   .get("/diagnostics", async (): Promise<DiagnosticsResponseBody> => {
+    const [inferenceHealthy, ocrStatus] = await Promise.all([
+      checkInferenceHealth(),
+      getOcrStatus(),
+    ]);
     return {
       watchDir: WATCH_DIR,
       previewDir: PREVIEW_DIR,
@@ -53,7 +57,10 @@ export const statsRoutes = new Elysia()
       dbDir: DB_DIR,
       serverPort: Number(process.env.PORT ?? 3001),
       inferenceUrl: INFERENCE_URL,
-      inferenceHealthy: await checkInferenceHealth(),
+      inferenceHealthy,
       ingestConcurrency: getIngestConcurrency(),
+      ocrActiveBackend: ocrStatus.ocrActiveBackend,
+      ocrHardwareCapable: ocrStatus.ocrHardwareCapable,
+      ocrModelLoaded: ocrStatus.ocrModelLoaded,
     };
   });

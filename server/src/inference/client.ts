@@ -67,3 +67,37 @@ export async function checkInferenceHealth(): Promise<boolean> {
     return false;
   }
 }
+
+interface OcrStatus {
+  ocrActiveBackend: "cuda" | "mps" | null;
+  ocrHardwareCapable: boolean;
+  ocrModelLoaded: boolean;
+}
+
+/**
+ * Reads the OCR tier fields off the inference sidecar's own `/health` (see
+ * inference/app.py) -- lets the Developer tab show whether DeepSeek-OCR-2 is
+ * actually in effect right now, distinct from the "high-quality OCR" setting
+ * just being turned on (which only unlocks the option, see
+ * src-tauri/src/lib.rs's `high_quality_ocr_enabled` doc comment).
+ */
+export async function getOcrStatus(): Promise<OcrStatus> {
+  try {
+    const response = await fetch(`${INFERENCE_URL}/health`);
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const body = (await response.json()) as {
+      ocrActiveBackend?: "cuda" | "mps" | null;
+      ocrModelLoaded?: boolean;
+      ocrCapability?: { cuda?: boolean; mps?: boolean };
+    };
+    return {
+      ocrActiveBackend: body.ocrActiveBackend ?? null,
+      ocrHardwareCapable: Boolean(
+        body.ocrCapability?.cuda || body.ocrCapability?.mps,
+      ),
+      ocrModelLoaded: body.ocrModelLoaded ?? false,
+    };
+  } catch {
+    return { ocrActiveBackend: null, ocrHardwareCapable: false, ocrModelLoaded: false };
+  }
+}

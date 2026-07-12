@@ -190,6 +190,22 @@ export function DeveloperPanel({ onSelectPhoto }: DeveloperPanelProps) {
     return t("developer.processStopped");
   }
 
+  // Distinct from the Settings toggle: that only *enables the option* --
+  // this reflects the inference sidecar's own live decision (hardware
+  // capability + whether the ~6.8GB weights have actually finished
+  // downloading and loading), which is what actually answers "is it using
+  // DeepSeek right now."
+  function ocrStatusLabel(): string | undefined {
+    if (!diagnostics) return undefined;
+    if (diagnostics.ocrActiveBackend && !diagnostics.ocrModelLoaded) {
+      return t("developer.ocrDownloading");
+    }
+    if (diagnostics.ocrActiveBackend === "cuda") return t("developer.ocrActiveCuda");
+    if (diagnostics.ocrActiveBackend === "mps") return t("developer.ocrActiveMps");
+    if (diagnostics.ocrHardwareCapable) return t("developer.ocrNativeCapable");
+    return t("developer.ocrNativeIncapable");
+  }
+
   const total = stats ? stats.currentlyIndexed + stats.queue + stats.processing : 0;
   const progressPercent =
     stats && total > 0 ? Math.round((stats.currentlyIndexed / total) * 100) : 100;
@@ -254,6 +270,7 @@ export function DeveloperPanel({ onSelectPhoto }: DeveloperPanelProps) {
                 diagnostics?.dbDir ?? (diagnostics ? t("developer.dbDirExternal") : undefined),
               ],
               [t("developer.inferenceUrl"), diagnostics?.inferenceUrl],
+              [t("developer.ocrStatus"), ocrStatusLabel()],
             ]}
           />
           <StatsCard

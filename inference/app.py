@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import random
+import sys
 import threading
 import zlib
 from pathlib import Path
@@ -29,6 +30,19 @@ def _log_rss(tag: str) -> None:
     temporary diagnostics for tracking down a real-world memory leak."""
     rss_mb = _process.memory_info().rss / (1024 * 1024)
     logger.info("[memory] %s: rss=%.1fMB", tag, rss_mb)
+
+
+def _ocr_model_loaded() -> bool:
+    """Whether DeepSeek-OCR-2's weights have actually finished downloading
+    and loading into memory -- distinct from resolve_ocr_backend()'s
+    ocrActiveBackend, which only reflects whether the tier is *selected* by
+    config+hardware, not whether the (lazy, ~6.8GB) load has happened yet.
+    Reads ocr.py's module-level cache via sys.modules rather than importing
+    it directly: ocr.py pulls in torch/transformers at import time, and
+    /health needs to stay cheap for a client that never opted into this
+    tier at all."""
+    ocr_module = sys.modules.get("ocr")
+    return bool(ocr_module is not None and ocr_module._model is not None)
 
 
 def _warmup_models() -> None:
@@ -159,6 +173,12 @@ def health():
         # weights were configured -- lets the client show "your GPU supports
         # the high-quality OCR tier" even before the user opts in.
         "ocrActiveBackend": deepseek_device,
+        # False even while ocrActiveBackend is "cuda"/"mps" means the tier is
+        # selected but the weights haven't been downloaded/loaded yet --
+        # that happens lazily on the first photo actually OCR'd after
+        # enabling the setting, which can take a while for the ~6.8GB
+        # download.
+        "ocrModelLoaded": _ocr_model_loaded(),
         "ocrCapability": {
             "cuda": hardware.cuda_capable(),
             "cudaVramGB": hardware.detect_nvidia_vram_gb(),

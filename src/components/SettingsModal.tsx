@@ -14,6 +14,7 @@ import {
   getAppSettings,
   pickWatchFolder,
   setFaceRecognitionEnabled,
+  setHighQualityOcrEnabled,
   setVisualSearchEnabled,
   setWatchDir,
   setWatchDirMode,
@@ -108,6 +109,18 @@ export function SettingsModal({ onClose, onSettingsChanged }: SettingsModalProps
     setIsBusy(true);
     try {
       await setVisualSearchEnabled(enabled);
+      loadSettings();
+    } catch {
+      showToast(t("settings.loadError"), "error");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleHighQualityOcrChange(enabled: boolean) {
+    setIsBusy(true);
+    try {
+      await setHighQualityOcrEnabled(enabled);
       loadSettings();
     } catch {
       showToast(t("settings.loadError"), "error");
@@ -267,6 +280,22 @@ export function SettingsModal({ onClose, onSettingsChanged }: SettingsModalProps
             {t("settings.visualSearch")}
           </label>
           <p className="text-xs text-mist-500">{t("settings.capabilitiesHint")}</p>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">
+          <span className={fieldLabel}>{t("settings.ocrQuality")}</span>
+          <label className="flex items-center gap-2 text-sm text-mist-300">
+            <input
+              type="checkbox"
+              checked={settings?.highQualityOcrEnabled ?? false}
+              disabled={isBusy}
+              onChange={(event) =>
+                void handleHighQualityOcrChange(event.target.checked)
+              }
+            />
+            {t("settings.highQualityOcr")}
+          </label>
+          <p className="text-xs text-mist-500">{t("settings.highQualityOcrHint")}</p>
         </div>
 
         <div className="flex flex-col gap-2 border-t border-navy-800 pt-3">

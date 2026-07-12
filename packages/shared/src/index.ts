@@ -210,6 +210,12 @@ export interface DiagnosticsResponseBody {
   inferenceUrl: string;
   inferenceHealthy: boolean;
   ingestConcurrency: number;
+  /** "cuda"/"mps" means the DeepSeek-OCR-2 tier is selected by config+hardware; null means the fast OS-native tier is used. */
+  ocrActiveBackend: "cuda" | "mps" | null;
+  /** Whether the detected hardware clears the VRAM/unified-memory bar for DeepSeek-OCR-2, regardless of whether it's enabled. */
+  ocrHardwareCapable: boolean;
+  /** Whether the (~6.8GB) DeepSeek-OCR-2 weights have actually finished downloading and loading -- false even when ocrActiveBackend is set means it's selected but not loaded yet. */
+  ocrModelLoaded: boolean;
 }
 
 export interface FaceMatchCandidate {
