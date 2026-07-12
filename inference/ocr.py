@@ -5,6 +5,8 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import torch
+
 from config import get_settings
 
 if TYPE_CHECKING:
@@ -61,7 +63,6 @@ def _load_model(device: str):
     if _model is not None:
         return _model, _tokenizer
 
-    import torch
     from transformers import AutoModel, AutoTokenizer
 
     settings = get_settings()
@@ -128,12 +129,22 @@ def read_text(image: "Image", device: str = "cuda") -> str:
                 base_size=1024,
                 # DeepSeek-OCR-2's encoder only supports two tile sizes -- 768
                 # (144 visual tokens) or 1024 (256 visual tokens), per its own
-                # "Support-Modes" doc. Anything else (640 was tried initially)
-                # hits an unguarded branch in deepencoderv2.py's
+                # "Support-Modes" doc. Anything else (640, the model's own
+                # default) hits an unguarded branch in deepencoderv2.py's
                 # Qwen2Decoder2Encoder.forward and crashes with an
-                # UnboundLocalError on `param_img`.
+                # UnboundLocalError on `param_img`. 768 here matches the tile
+                # size dynamic_preprocess() hardcodes internally when
+                # crop_mode is on, so the two stay in sync.
                 image_size=768,
-                crop_mode=False,
+                # crop_mode=True splits any image bigger than 768x768 into up
+                # to 6 tiles (plus a downsampled global view) instead of
+                # squeezing the whole frame into a single 768x768 encoder
+                # input. Without it, a bib number that's large and legible in
+                # a multi-thousand-pixel source photo can still get crushed
+                # past readability once the *entire* scene is downsampled to
+                # 768px -- exactly the class of miss sports-mode/higher-res
+                # OCR sourcing were meant to prevent.
+                crop_mode=True,
                 save_results=True,
             )
 
