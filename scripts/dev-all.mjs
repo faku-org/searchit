@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Runs inference + server + client together as one command, for the plain
-// browser-mode dev loop (localhost:1420 hitting the server directly) that
+// browser-mode dev loop (localhost:4420 hitting the server directly) that
 // AGENTS.md documents as three separate terminals. This is NOT a replacement
 // for `bun run tauri dev` / `bun run tauri build`, which already autostart
 // both sidecars as part of the actual desktop app -- this script exists for
@@ -131,7 +131,7 @@ if (mode === "prod") {
 
 const inferencePort = readEnvValue(join(inferenceDir, ".env"), "PORT", "8000");
 const serverPort = readEnvValue(join(serverDir, ".env"), "PORT", "3001");
-const clientPort = "1420"; // fixed by vite.config.ts's strictPort
+const clientPort = "4420"; // fixed by vite.config.ts's strictPort
 
 killPortIfOccupied(inferencePort, "inference");
 killPortIfOccupied(serverPort, "server");

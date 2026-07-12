@@ -5,7 +5,7 @@
 // leaves orphaned processes running.
 //
 // Two kinds of args:
-// - numeric: a TCP port to free (Vite's dev server binds a fixed port, 1420,
+// - numeric: a TCP port to free (Vite's dev server binds a fixed port, 4420,
 //   with `strictPort: true` in vite.config.ts, so an orphaned listener makes
 //   the next `tauri dev` fail outright instead of just picking a new port).
 // - name: a process base name (e.g. "bun-server") to kill by image name. The

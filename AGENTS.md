@@ -33,7 +33,7 @@ Python, or Bun install required on the end user's machine:
 
 ```bash
 bun install                 # installs root + server + packages/* workspaces
-bun dev                     # vite dev server (port 1420, Tauri-aware)
+bun dev                     # vite dev server (port 4420, Tauri-aware)
 bun run tauri dev           # launch the actual desktop window (autostarts both sidecars)
 bun run build               # tsc && vite build
 bun run tauri build         # produce installers (see release workflow below)
