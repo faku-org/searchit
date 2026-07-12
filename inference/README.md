@@ -61,7 +61,10 @@ directly.
   numbers on race photos that RapidOCR reads correctly, so it was dropped.
   `scripts/bundle-inference.mjs` `--collect-data`s RapidOCR's weights the
   same way it does insightface's, so the shipped sidecar works offline from
-  first launch instead of downloading them at runtime.
+  first launch instead of downloading them at runtime. Like faces.py and
+  clip_embed.py, it runs on `config.get_execution_providers()`'s pick
+  (DirectML on Windows, CUDA on the `ml` extra's box) instead of RapidOCR's
+  own CPU-only defaults -- same DirectML force-reinstall caveat above applies.
 
 Two capabilities beyond OCR can be turned off entirely from the desktop
 client's Settings (face recognition, visual/text search) -- see
