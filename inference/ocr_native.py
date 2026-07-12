@@ -12,14 +12,17 @@ _rapidocr_engine = None
 
 
 def read_scene_text(image: "Image", min_confidence: float | None = None) -> str:
-    """Cross-platform OCR with no GPU and no multi-gigabyte model download:
-    Apple Vision on macOS (OS-native, free), else a small bundled ONNX OCR
-    model (RapidOCR) that runs anywhere onnxruntime does -- including
+    """Cross-platform OCR with no GPU required and no multi-gigabyte model
+    download: Apple Vision on macOS (OS-native, free), else a small bundled
+    ONNX OCR model (RapidOCR) that runs anywhere onnxruntime does -- including
     Windows, where Windows.Media.Ocr used to be the default until testing
     showed it missing small, angled bib numbers on race photos that RapidOCR
-    reads correctly (see git history around "sports mode"). See ocr.py for
-    the separate, higher-quality DeepSeek-OCR-2 tier used instead of this on
-    an NVIDIA CUDA box with the `ml` extra installed.
+    reads correctly (see git history around "sports mode"). RapidOCR opts
+    into whichever onnxruntime execution provider config.get_execution_providers
+    picks (DirectML on Windows, CUDA on the `ml` extra's box), same as
+    faces.py/clip_embed.py, so it isn't CPU-only either. See ocr.py for the
+    separate, higher-quality DeepSeek-OCR-2 tier used instead of this on an
+    NVIDIA CUDA box with the `ml` extra installed.
 
     min_confidence drops low-score per-line detections before joining them
     into the returned text -- only honored on backends that actually expose a
@@ -78,7 +81,24 @@ def _read_with_rapidocr(image: "Image", min_confidence: float | None = None) -> 
         if _rapidocr_engine is None:
             from rapidocr import RapidOCR
 
-            _rapidocr_engine = RapidOCR()
+            from config import get_execution_providers
+
+            # RapidOCR ships its own onnxruntime engine config, defaulting
+            # every accelerator flag (use_cuda/use_dml) to False -- left at
+            # defaults it always ran on CPU regardless of which onnxruntime
+            # wheel (plain/-directml/-gpu) was actually installed. Wiring it
+            # to the same provider detection faces.py/clip_embed.py use
+            # (config.get_execution_providers) lets it pick up DirectML on
+            # Windows or CUDA on the `ml` extra's box, same as those. No
+            # use_coreml here: read_scene_text() routes macOS to Apple Vision
+            # before this function ever runs.
+            providers = get_execution_providers()
+            _rapidocr_engine = RapidOCR(
+                params={
+                    "EngineConfig.onnxruntime.use_cuda": "CUDAExecutionProvider" in providers,
+                    "EngineConfig.onnxruntime.use_dml": "DmlExecutionProvider" in providers,
+                }
+            )
 
         result = _rapidocr_engine(np.array(image.convert("RGB")))
 

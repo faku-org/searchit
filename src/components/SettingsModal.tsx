@@ -165,7 +165,7 @@ export function SettingsModal({ onClose, onSettingsChanged }: SettingsModalProps
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={springTransition}
-        className={`${modalPanel} max-w-md`}
+        className={`${modalPanel} max-w-md max-h-[80vh] overflow-y-auto`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between">
