@@ -116,11 +116,12 @@ run(
     workDir,
     "--collect-data",
     "insightface",
-    // No --collect-data for rapidocr: ocr_native.py only reaches it on a
-    // platform that's neither Darwin nor win32, which is unreachable on
-    // both platforms this app actually ships for (see release.yml's
-    // matrix) -- bundling its weights here would be dead weight in every
-    // installer.
+    // ocr_native.py's default OCR tier on every platform but macOS -- bundle
+    // its ~32MB of ONNX weights the same way insightface's are, so it works
+    // offline from first launch instead of trying (and on a read-only
+    // install directory, failing) to download them at runtime.
+    "--collect-data",
+    "rapidocr",
     "--add-data",
     `${meanshapePath}${addDataSep}objects`,
     join(inferenceDir, "main.py"),

@@ -54,14 +54,14 @@ directly.
 - **CLIP** (`clip_embed.py`): a pre-exported ONNX build of
   `openai/clip-vit-base-patch32` (`Xenova/clip-vit-base-patch32`'s quantized
   vision/text encoders, ~150MB combined), also downloaded on first use.
-- **OCR** (`ocr_native.py`): OS-native text recognition where the OS ships one
-  for free -- Apple Vision on macOS, `Windows.Media.Ocr` on Windows -- with no
-  model download at all. Any other platform (e.g. Linux dev machines) falls
-  back to a small bundled ONNX OCR model (RapidOCR), which ships its own
-  weights in the pip package. Since that fallback is unreachable on either
-  platform this app actually ships for, `scripts/bundle-inference.mjs`
-  doesn't `--collect-data` RapidOCR's weights into the shipped sidecar --
-  only a local `uv run` on some other OS would ever need them.
+- **OCR** (`ocr_native.py`): Apple Vision (OS-native, no model download) on
+  macOS; a small bundled ONNX OCR model (RapidOCR, ~32MB weights shipped in
+  the pip package) everywhere else, including Windows. Windows used to
+  default to `Windows.Media.Ocr` instead, but it missed small/angled bib
+  numbers on race photos that RapidOCR reads correctly, so it was dropped.
+  `scripts/bundle-inference.mjs` `--collect-data`s RapidOCR's weights the
+  same way it does insightface's, so the shipped sidecar works offline from
+  first launch instead of downloading them at runtime.
 
 Two capabilities beyond OCR can be turned off entirely from the desktop
 client's Settings (face recognition, visual/text search) -- see

@@ -9,74 +9,25 @@ if TYPE_CHECKING:
     from PIL.Image import Image
 
 _rapidocr_engine = None
-_windows_ocr_engine = None
-_windows_ocr_engine_loaded = False
 
 
 def read_scene_text(image: "Image", min_confidence: float | None = None) -> str:
     """Cross-platform OCR with no GPU and no multi-gigabyte model download:
-    OS-native text recognition where the OS ships one for free (Apple Vision
-    on macOS, Windows.Media.Ocr on Windows), else a small bundled ONNX OCR
-    model (RapidOCR) that runs anywhere onnxruntime does. See ocr.py for the
-    separate, higher-quality DeepSeek-OCR-2 tier used instead of this on an
-    NVIDIA CUDA box with the `ml` extra installed.
+    Apple Vision on macOS (OS-native, free), else a small bundled ONNX OCR
+    model (RapidOCR) that runs anywhere onnxruntime does -- including
+    Windows, where Windows.Media.Ocr used to be the default until testing
+    showed it missing small, angled bib numbers on race photos that RapidOCR
+    reads correctly (see git history around "sports mode"). See ocr.py for
+    the separate, higher-quality DeepSeek-OCR-2 tier used instead of this on
+    an NVIDIA CUDA box with the `ml` extra installed.
 
     min_confidence drops low-score per-line detections before joining them
     into the returned text -- only honored on backends that actually expose a
     per-detection score (RapidOCR, Apple Vision's topCandidates confidence).
-    Windows.Media.Ocr's public API has no per-word/line confidence at all, so
-    it's ignored there.
     """
-    system = platform.system()
-    if system == "Darwin":
+    if platform.system() == "Darwin":
         return _read_with_apple_vision(image, min_confidence)
-    if system == "Windows":
-        return _read_with_windows_ocr(image)
     return _read_with_rapidocr(image, min_confidence)
-
-
-def _get_windows_ocr_engine():
-    # Recreating OcrEngine per call (as this used to) churns a WinRT/COM
-    # object on every photo in a batch instead of once -- unlike every other
-    # engine in this module/service, which is cached as a singleton.
-    global _windows_ocr_engine, _windows_ocr_engine_loaded
-    if not _windows_ocr_engine_loaded:
-        from winsdk.windows.media.ocr import OcrEngine
-
-        _windows_ocr_engine = OcrEngine.try_create_from_user_profile_languages()
-        _windows_ocr_engine_loaded = True
-    return _windows_ocr_engine
-
-
-def _read_with_windows_ocr(image: "Image") -> str:
-    import asyncio
-    import io
-
-    from winsdk.windows.graphics.imaging import BitmapDecoder
-    from winsdk.windows.storage.streams import DataWriter, InMemoryRandomAccessStream
-
-    engine = _get_windows_ocr_engine()
-    if engine is None:
-        return ""
-
-    async def _recognize() -> str:
-        buf = io.BytesIO()
-        image.convert("RGB").save(buf, format="PNG")
-
-        stream = InMemoryRandomAccessStream()
-        writer = DataWriter(stream)
-        writer.write_bytes(buf.getvalue())
-        await writer.store_async()
-        await writer.flush_async()
-        stream.seek(0)
-
-        decoder = await BitmapDecoder.create_async(stream)
-        bitmap = await decoder.get_software_bitmap_async()
-
-        result = await engine.recognize_async(bitmap)
-        return result.text
-
-    return asyncio.run(_recognize())
 
 
 def _read_with_apple_vision(image: "Image", min_confidence: float | None = None) -> str:

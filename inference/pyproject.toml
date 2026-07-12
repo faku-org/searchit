@@ -23,11 +23,12 @@ dependencies = [
   # as ONNX).
   "transformers>=4.46",
   "huggingface-hub>=0.26",
-  # OS-native OCR (ocr_native.py) covers Windows/macOS for free; this is the
-  # fallback ONNX OCR tier for everything else, bundled with its own small
-  # model weights (no separate download).
+  # ocr_native.py's OCR tier: Apple Vision covers macOS for free; this
+  # bundled ONNX model (its own small weights, auto-downloaded on first use)
+  # covers everything else, including Windows -- Windows.Media.Ocr used to
+  # be the Windows default but missed small/angled bib numbers RapidOCR
+  # reads correctly, so it was dropped in favor of this everywhere but macOS.
   "rapidocr>=2.0",
-  "winsdk>=1.0.0b0; sys_platform == 'win32'",
   "pyobjc-framework-Vision; sys_platform == 'darwin'",
   "pyobjc-framework-Quartz; sys_platform == 'darwin'",
   # Per-request RSS logging in app.py, to pin down which endpoint is
