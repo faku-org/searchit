@@ -5,6 +5,7 @@ import type { PhotoSummary } from "@searchit/shared";
 import { previewUrl } from "../lib/api";
 import { statusLabel, useTranslation } from "../lib/i18n";
 import { staggerContainer, staggerItem } from "../lib/theme";
+import { useSquircleClipPath } from "../lib/useSquircleClipPath";
 
 interface ResultsGridProps {
   photos: PhotoSummary[];
@@ -119,6 +120,20 @@ export function ResultsGrid({ photos, onSelect }: ResultsGridProps) {
   );
 }
 
+// A photo whose long edge beats its short edge by this much reads as
+// wide/ultra-wide (16:9 and beyond) rather than a standard landscape shot,
+// so it gets to keep its horizontal shape instead of being cropped to the
+// grid's default card shape.
+const WIDE_ASPECT_RATIO = 16 / 9;
+
+// Figma spec: cards are 280x309 (portrait/standard) or 600x309 (wide/ultra-
+// wide, spanning two grid columns) -- same row height either way, width
+// carries the aspect ratio. 42px corner radius at iOS-level (60%) smoothing.
+const CARD_ASPECT_RATIO = "280/309";
+const WIDE_CARD_ASPECT_RATIO = "600/309";
+const SQUIRCLE_CORNER_RADIUS = 32;
+const SQUIRCLE_CORNER_SMOOTHING = 0.6;
+
 function PhotoCard({
   photo,
   dateLabel,
@@ -130,14 +145,31 @@ function PhotoCard({
 }) {
   const { t } = useTranslation();
 
+  const isWide =
+    photo.width !== null &&
+    photo.height !== null &&
+    photo.width / photo.height >= WIDE_ASPECT_RATIO;
+
+  const { ref: squircleRef, clipPath } = useSquircleClipPath<HTMLButtonElement>({
+    cornerRadius: SQUIRCLE_CORNER_RADIUS,
+    cornerSmoothing: SQUIRCLE_CORNER_SMOOTHING,
+  });
+
   return (
     <motion.button
+      ref={squircleRef}
       type="button"
       variants={staggerItem}
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(photo)}
-      className="group relative flex aspect-square flex-col overflow-hidden rounded-2xl border border-navy-800 bg-navy-900 text-left"
+      style={{
+        clipPath,
+        aspectRatio: isWide ? WIDE_CARD_ASPECT_RATIO : CARD_ASPECT_RATIO,
+      }}
+      className={`group relative flex flex-col overflow-hidden bg-navy-900 text-left shadow-[inset_0_0_0_1px_var(--color-navy-800)] ${
+        isWide ? "sm:col-span-2" : ""
+      }`}
     >
       <img
         src={previewUrl(photo.id)}

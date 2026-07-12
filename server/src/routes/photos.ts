@@ -45,6 +45,8 @@ async function rankBySimilarity(
       gpsLon: photos.gpsLon,
       status: photos.status,
       customId: photos.customId,
+      width: photos.width,
+      height: photos.height,
       embedding: imageEmbeddings.embedding,
     })
     .from(photos)
@@ -72,6 +74,8 @@ async function rankBySimilarity(
         gpsLon: row.gpsLon,
         status: row.status,
         customId: row.customId,
+        width: row.width,
+        height: row.height,
       }),
     );
 }

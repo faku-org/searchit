@@ -33,6 +33,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "autoprefixer": "^10.5.2",
+    "figma-squircle": "^1.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.23.0",
     "motion": "^12.42.2",

@@ -160,6 +160,8 @@ export const identitiesRoutes = new Elysia({ prefix: "/identities" })
           gpsLon: photos.gpsLon,
           status: photos.status,
           customId: photos.customId,
+          width: photos.width,
+          height: photos.height,
         })
         .from(photos)
         .innerJoin(
@@ -188,6 +190,8 @@ export const identitiesRoutes = new Elysia({ prefix: "/identities" })
             gpsLon: row.gpsLon,
             status: row.status,
             customId: row.customId,
+            width: row.width,
+            height: row.height,
           }),
         );
     },

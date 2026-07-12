@@ -79,6 +79,8 @@ export const searchRoutes = new Elysia().get(
         gpsLon: photos.gpsLon,
         status: photos.status,
         customId: photos.customId,
+        width: photos.width,
+        height: photos.height,
         recognizedText: photos.recognizedText,
         imageEmbedding: imageEmbeddings.embedding,
       })
@@ -163,6 +165,8 @@ export const searchRoutes = new Elysia().get(
         gpsLon: row.gpsLon,
         status: row.status,
         customId: row.customId,
+        width: row.width,
+        height: row.height,
       }),
     );
   },
