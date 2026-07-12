@@ -76,6 +76,8 @@ export interface PhotoSummary {
   gpsLon: number | null;
   status: PhotoStatus;
   customId: string | null;
+  width: number | null;
+  height: number | null;
 }
 
 export interface FaceDetection {
