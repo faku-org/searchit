@@ -94,7 +94,16 @@ const findMeanshape = Bun.spawnSync({
     "import insightface, os; print(os.path.join(os.path.dirname(insightface.__file__), 'data', 'objects', 'meanshape_68.pkl'))",
   ],
 });
+if (!findMeanshape.success) {
+  console.error("Failed to locate insightface meanshape_68.pkl:");
+  console.error(findMeanshape.stderr.toString());
+  process.exit(1);
+}
 const meanshapePath = findMeanshape.stdout.toString().trim();
+if (!meanshapePath) {
+  console.error("insightface meanshape_68.pkl path is empty — is insightface installed in the build venv?");
+  process.exit(1);
+}
 const addDataSep = isWindows ? ";" : ":";
 
 rmSync(join(stagingRoot, distDirName), { recursive: true, force: true });
